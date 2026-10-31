@@ -33,6 +33,28 @@
   .btn:hover{background:#fff07a}
   .note{margin-top:12px;color:#9fd3ff;font-size:13px}
   .big{font-size:28px;margin:.3em 0}
+  /* game over + scoreboard */
+  #over{overflow-y:auto;justify-content:safe center;padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));box-sizing:border-box}
+  .overGrid{display:flex;flex-wrap:wrap;gap:16px 36px;align-items:center;justify-content:center;max-width:100%}
+  .overLeft{display:flex;flex-direction:column;align-items:center;min-width:0}
+  .lbBox{background:rgba(0,0,0,.45);border:2px solid #3b6fd8;border-radius:6px;padding:10px 18px;min-width:230px}
+  .lbTitle{color:#ffd84a;font-style:italic;font-weight:800;letter-spacing:.12em;font-size:14px;margin-bottom:6px;text-align:center}
+  #lbList{list-style:none;margin:0;padding:0;font-variant-numeric:tabular-nums;font-size:15px}
+  #lbList li{display:grid;grid-template-columns:2.2em 3.4em 1fr;gap:6px;padding:2px 4px;border-radius:3px;text-align:left}
+  #lbList li .sc{text-align:right;font-weight:700}
+  #lbList li.me{background:rgba(255,216,74,.25);color:#ffd84a}
+  #lbList li.empty{opacity:.4}
+  #lbEntry{margin-top:10px;display:flex;flex-direction:column;align-items:center;gap:6px}
+  .lbNew{color:#ffd84a;font-weight:800;font-style:italic;letter-spacing:.1em}
+  #lbEntry label{font-size:13px;color:#9fd3ff}
+  .lbRow{display:flex;gap:8px}
+  #initials{width:4.2em;font:800 28px 'Segoe UI',Tahoma,sans-serif;text-align:center;text-transform:uppercase;letter-spacing:.15em;
+    background:#0b1430;color:#fff;border:2px solid #ffd84a;border-radius:4px;padding:4px 6px;-webkit-user-select:text;user-select:text}
+  body.touch #initials{-webkit-user-select:text;user-select:text;-webkit-touch-callout:default}
+  #lbSubmit{font:italic 800 18px 'Segoe UI',Tahoma,sans-serif;background:#ffd84a;color:#111;border:none;border-radius:4px;padding:0 16px;cursor:pointer}
+  #lbSubmit:disabled{opacity:.5}
+  #initials:focus-visible,#lbSubmit:focus-visible,.btn:focus-visible{outline:3px solid #fff;outline-offset:2px}
+  @media (max-height:520px){ #over h1{font-size:40px} #over .btn{margin-top:12px} .big{font-size:24px;margin:.1em 0} }
 
   /* ---------- touch controls ---------- */
   #touch{position:fixed;inset:0;z-index:3;display:none;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
@@ -124,9 +146,27 @@
 
 <div id="over" class="overlay hidden">
   <h1>GAME OVER</h1>
-  <div class="big" id="overHits">0 HITS</div>
-  <div class="note" id="overBest"></div>
-  <button class="btn" id="againBtn">FLY AGAIN</button>
+  <div class="overGrid">
+    <div class="overLeft">
+      <div class="big" id="overHits">0 HITS</div>
+      <div class="note" id="overStats"></div>
+      <div class="note" id="overBest"></div>
+      <form id="lbEntry" class="hidden" autocomplete="off">
+        <div class="lbNew">NEW HIGH SCORE!</div>
+        <label for="initials">Enter your initials</label>
+        <div class="lbRow">
+          <input id="initials" maxlength="3" autocapitalize="characters" autocorrect="off" spellcheck="false" inputmode="text" enterkeyhint="done" placeholder="AAA">
+          <button type="submit" id="lbSubmit">SAVE</button>
+        </div>
+      </form>
+      <button class="btn" id="againBtn">FLY AGAIN</button>
+    </div>
+    <div class="lbBox">
+      <div class="lbTitle">GLOBAL TOP 10</div>
+      <ol id="lbList"></ol>
+      <div class="note" id="lbStatus"></div>
+    </div>
+  </div>
 </div>
 
 <div id="noengine" class="overlay hidden">
@@ -333,8 +373,8 @@ function makePlayerShip() {
   const eng = new THREE.CylinderGeometry(2.4, 3, 3.5, 8); eng.rotateX(Math.PI / 2); eng.translate(0, 0, 13);
   g.add(new THREE.Mesh(eng, grey));
   const flame = new THREE.Group(); flame.position.z = 14.8;
-  const fg = new THREE.ConeGeometry(2.6, 9, 8); fg.rotateX(Math.PI / 2); fg.translate(0, 0, 4.5);
-  flame.add(new THREE.Mesh(fg, glow(0xffa040, 0.9)));
+  const fg = new THREE.ConeGeometry(1.7, 6, 8); fg.rotateX(Math.PI / 2); fg.translate(0, 0, 3);
+  flame.add(new THREE.Mesh(fg, glow(0xffa040, 0.7)));
   g.add(flame);
   g.userData.flame = flame;
   const bubble = new THREE.Mesh(new THREE.IcosahedronGeometry(17, 1), new THREE.MeshBasicMaterial({
@@ -372,7 +412,9 @@ scene.add(ship);
 /* =====================================================================
    SHARED PROJECTILE / FX ASSETS
    ===================================================================== */
-const laserGeo = new THREE.BoxGeometry(0.8, 0.8, 16);
+const laserGeo = new THREE.BoxGeometry(1.3, 1.3, 30);
+const laserGlowGeo = new THREE.BoxGeometry(3.6, 3.6, 34);
+const matLaserGlowG = glow(0x66ff66, 0.28), matLaserGlowB = glow(0x66b0ff, 0.28);
 const matLaserG = glow(0x66ff66), matLaserB = glow(0x66b0ff);
 const shotGeo = new THREE.SphereGeometry(2.8, 8, 6);
 const matEShot = glow(0xff7a2a), matEShotRival = glow(0xffd040), matDeflect = glow(0x9fffff);
@@ -434,6 +476,9 @@ function distVol(pos, base) { return base * clamp(1 - pos.distanceTo(P.pos) / 26
    ===================================================================== */
 let state = 'title';
 let hits = 0, best = 0, time = 0;
+// difficulty ramps with time survived: D goes 0 -> 1 over 3 minutes, keeps creeping to 1.6
+let runT = 0, threat = 1, D = 0;
+const DM = () => Math.min(1, D);
 try { best = +(localStorage.getItem('allrange_best') || 0); } catch (e) { best = 0; }
 document.getElementById('best').textContent = best;
 let invertY = false, camMode = 0, shake = 0;
@@ -471,17 +516,18 @@ function updateComm(dt) {
 const keys = {};
 const BLOCK = new Set(['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ShiftLeft', 'ShiftRight']);
 addEventListener('keydown', e => {
+  if (e.target && e.target.tagName === 'INPUT') return; // typing initials
   keys[e.code] = true;
   if (BLOCK.has(e.code)) e.preventDefault();
   if (e.repeat) return;
   if (e.code === 'KeyT') { invertY = !invertY; say('SYSTEM', invertY ? 'Inverted pitch ON (up = nose down).' : 'Inverted pitch OFF (up = nose up).', '#ffd84a'); }
   if (e.code === 'KeyM') { SFX.on = !SFX.on; if (SFX.master) SFX.master.gain.value = SFX.on ? 0.35 : 0; }
-  if ((e.code === 'Enter' || e.code === 'NumpadEnter') && (state === 'title' || state === 'over')) startGame();
+  if ((e.code === 'Enter' || e.code === 'NumpadEnter') && (state === 'title' || (state === 'over' && !lbEntering()))) startGame();
 });
 addEventListener('keyup', e => { keys[e.code] = false; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; if (state === 'play') setPause(true); });
 document.getElementById('startBtn').onclick = () => startGame();
-document.getElementById('againBtn').onclick = () => startGame();
+document.getElementById('againBtn').onclick = () => { lb.entering = false; startGame(); };
 
 function readPad() {
   const pads = navigator.getGamepads ? navigator.getGamepads() : [];
@@ -527,7 +573,7 @@ function spawnEnemy(rival = false) {
   const mesh = makeEnemyShip(rival);
   const e = {
     mesh, rival, alive: true, hp: rival ? 30 : 2, r: rival ? 15 : 11,
-    pos: V(), dir: V(), speed: rival ? 250 : rand(150, 185), turn: rival ? 2.1 : rand(1.1, 1.5),
+    pos: V(), dir: V(), speed: (rival ? 250 : rand(150, 185)) * (1 + 0.3 * D), turn: (rival ? 2.1 : rand(1.1, 1.5)) * (1 + 0.55 * D),
     off: V(rand(-1, 1), rand(-0.3, 1), rand(-1, 1)).normalize(),
     mode: 'wander', modeT: rand(1.5, 3), fireCd: rand(1.5, 3), burst: 0, target: V(), flash: 0, bank: 0
   };
@@ -538,6 +584,7 @@ function spawnEnemy(rival = false) {
     e.mode = 'attack'; e.modeT = 10;
   } else {
     e.pos.set(rand(-50, 50), MS_Y - 110, rand(-50, 50));
+    if (state === 'play') explode(e.pos, 14, 0xff7040, 0); // launch flash from the carrier's core
     const a = rand(0, Math.PI * 2);
     e.dir.set(Math.cos(a), -0.7, Math.sin(a)).normalize();
     e.target.set(Math.cos(a) * rand(600, 1800), rand(250, 800), Math.sin(a) * rand(600, 1800));
@@ -635,9 +682,11 @@ function raiseShield() {
 
 function fireLaser() {
   const hyper = P.laser >= 2;
-  const offs = P.laser === 0 ? [V(0, 0, -12)] : [V(-8, -0.5, 2), V(8, -0.5, 2)];
+  // bolts start just ahead of the nose / wing roots so they're clear of the hull
+  const offs = P.laser === 0 ? [V(0, 1, -22)] : [V(-8, 0.5, -12), V(8, 0.5, -12)];
   for (const o of offs) {
     const m = new THREE.Mesh(laserGeo, hyper ? matLaserB : matLaserG);
+    m.add(new THREE.Mesh(laserGlowGeo, hyper ? matLaserGlowB : matLaserGlowG));
     const pos = o.applyQuaternion(P.q).add(P.pos);
     m.position.copy(pos); m.quaternion.copy(P.q); scene.add(m);
     shots.push({ kind: 'laser', owner: 'p', mesh: m, pos, vel: P.fwd.clone().multiplyScalar(1350 + P.speed), life: 1.1, r: 2.5, dmg: hyper ? 2 : (P.laser === 1 ? 1.5 : 1) });
@@ -869,14 +918,14 @@ function updateEnemies(dt) {
         e.mode = 'break'; e.modeT = rand(1.5, 3);
         e.target.set(rand(-R, R) * 0.7, rand(200, 900), rand(-R, R) * 0.7);
       } else {
-        e.mode = (!P.dead && Math.random() < (e.rival ? 0.9 : 0.6)) ? 'attack' : 'wander';
-        e.modeT = e.mode === 'attack' ? rand(5, 9) : rand(2, 4);
+        e.mode = (!P.dead && Math.random() < (e.rival ? 0.9 : 0.55 + 0.35 * DM())) ? 'attack' : 'wander';
+        e.modeT = e.mode === 'attack' ? rand(5, 9) * (1 + 0.4 * DM()) : rand(2, 4) / (1 + DM());
         if (e.mode === 'wander') e.target.set(rand(-R, R) * 0.75, rand(150, 1000), rand(-R, R) * 0.75);
       }
     }
     if (P.dead && e.mode === 'attack') { e.mode = 'wander'; e.modeT = 3; e.target.set(rand(-R, R) * 0.7, rand(200, 900), rand(-R, R) * 0.7); }
     // break off well before contact, peeling away to one side
-    if (e.mode === 'attack' && dist < (e.rival ? 160 : 240)) {
+    if (e.mode === 'attack' && dist < (e.rival ? 160 : 240 - 70 * DM())) {
       e.mode = 'break'; e.modeT = rand(1.6, 2.6);
       T2.crossVectors(e.dir, AY); if (T2.lengthSq() < 1e-3) T2.set(1, 0, 0);
       T2.normalize().multiplyScalar(Math.random() < 0.5 ? 1 : -1);
@@ -885,7 +934,7 @@ function updateEnemies(dt) {
     }
 
     // attack runs aim past the player's shoulder (a strafing pass), not at the player
-    if (e.mode === 'attack') desired.copy(P.pos).addScaledVector(P.vel, 0.45).addScaledVector(e.off, 140).sub(e.pos);
+    if (e.mode === 'attack') desired.copy(P.pos).addScaledVector(P.vel, 0.45).addScaledVector(e.off, 140 - 60 * DM()).sub(e.pos);
     else desired.subVectors(e.target, e.pos);
     // last-moment avoidance if something still gets too close
     if (dist < 130) desired.normalize().addScaledVector(T1, -2.5 / Math.max(dist, 1));
@@ -918,12 +967,12 @@ function updateEnemies(dt) {
 
     // fire
     e.fireCd -= dt;
-    if (e.mode === 'attack' && !P.dead && dist < 1000 && e.fireCd <= 0) {
+    if (e.mode === 'attack' && !P.dead && dist < 1000 + 300 * DM() && e.fireCd <= 0) {
       T2.copy(T1).divideScalar(dist);
-      if (e.dir.dot(T2) > 0.93) {
+      if (e.dir.dot(T2) > 0.93 - 0.05 * DM()) {
         fireEnemyShot(e, dist);
         if (e.rival) { e.burst++; e.fireCd = e.burst % 3 ? 0.14 : 1.4; }
-        else e.fireCd = rand(1.4, 2.6);
+        else { e.burst++; e.fireCd = (D > 0.6 && e.burst % 2) ? 0.18 : rand(1.4, 2.6) / (1 + 0.9 * D); } // late game: 2-shot bursts
       }
     }
 
@@ -933,9 +982,10 @@ function updateEnemies(dt) {
 
   // spawning
   spawnT -= dt;
-  const want = Math.min(14, 6 + Math.floor(hits / 12));
+  // the carrier launches more fighters, faster, the longer you survive
+  const want = Math.min(30, 5 + Math.floor(runT / 20));
   const normals = enemies.filter(e => !e.rival).length;
-  if (normals < want && spawnT <= 0) { spawnEnemy(false); spawnT = 1.2; }
+  if (normals < want && spawnT <= 0) { spawnEnemy(false); spawnT = Math.max(0.35, 1.3 - runT * 0.004); }
   if (hits >= rivalNext && !enemies.some(e => e.rival)) {
     rivalNext += 90;
     spawnEnemy(true);
@@ -945,9 +995,10 @@ function updateEnemies(dt) {
 
 function fireEnemyShot(e, dist) {
   const pos = e.dir.clone().multiplyScalar(e.r).add(e.pos);
-  const tgt = P.pos.clone().addScaledVector(P.vel, dist / 460);
-  tgt.x += rand(-14, 14); tgt.y += rand(-14, 14); tgt.z += rand(-14, 14);
-  const vel = tgt.sub(pos).normalize().multiplyScalar(460);
+  const tgt = P.pos.clone().addScaledVector(P.vel, dist / (460 + 140 * DM()));
+  const jit = 22 - 14 * DM(), sp = 460 + 140 * DM();
+  tgt.x += rand(-jit, jit); tgt.y += rand(-jit, jit); tgt.z += rand(-jit, jit);
+  const vel = tgt.sub(pos).normalize().multiplyScalar(sp);
   const m = new THREE.Mesh(shotGeo, e.rival ? matEShotRival : matEShot);
   m.position.copy(pos); scene.add(m);
   shots.push({ kind: 'eshot', owner: 'e', mesh: m, pos, vel, life: 3, r: 3, dmg: e.rival ? 8 : 6, shooter: e });
@@ -1057,7 +1108,7 @@ function collect(type) {
 const camPos = V(), camLook = V(), camUp = V(0, 1, 0), tmpUp = V();
 function snapCamera() {
   shipQuat(P.q); P.fwd.set(0, 0, -1).applyQuaternion(P.q);
-  camPos.copy(V(0, 7, 34).applyQuaternion(P.q).add(P.pos));
+  camPos.copy(V(0, 14, 46).applyQuaternion(P.q).add(P.pos));
   camUp.set(0, 1, 0);
 }
 function updateCamera(dt) {
@@ -1076,9 +1127,9 @@ function updateCamera(dt) {
     return;
   }
   if (camMode === 0) {
-    T1.set(0, 7, 34).applyQuaternion(P.q).add(P.pos);
+    T1.set(0, 14, 46).applyQuaternion(P.q).add(P.pos);
     camPos.lerp(T1, 1 - Math.exp(-dt * 7));
-    camLook.copy(P.pos).addScaledVector(P.fwd, 60);
+    camLook.copy(P.pos).addScaledVector(P.fwd, 170).addScaledVector(T2.set(0, 1, 0).applyQuaternion(P.q), 8);
     tmpUp.set(0, 1, 0).applyQuaternion(P.q);
     camUp.lerp(tmpUp, 1 - Math.exp(-dt * 6)).normalize();
   } else {
@@ -1202,6 +1253,7 @@ function drawHUD() {
   // hits (top-center)
   txt('HITS', W / 2, 18, '#ffd84a', 13, 'center');
   txt(String(hits).padStart(3, '0'), W / 2, 42, '#ffffff', 28, 'center');
+  txt('THREAT ' + threat, W / 2, 66, threat >= 7 ? '#ff6040' : threat >= 4 ? '#ffb040' : '#9fd3ff', 12, 'center');
 
   // lives & laser (bottom-left)
   // on touch screens the bottom corners belong to the thumbs, so these move up top
@@ -1275,7 +1327,7 @@ function clearWorld() {
 function startGame() {
   actx(); engineStart();
   clearWorld();
-  hits = 0; rivalNext = 60; spawnT = 0; tailWarnCd = 6; lowWarned = false; edgeHinted = false;
+  hits = 0; rivalNext = 60; spawnT = 0; runT = 0; threat = 1; D = 0; tailWarnCd = 6; lowWarned = false; edgeHinted = false;
   Object.assign(P, { lives: 3, bombs: 3, laser: 0, charge: 0, fireHeld: 0, lock: null, man: null, shieldT: 0, tailT: 0 });
   respawn(); P.invuln = 1.5;
   for (let i = 0; i < 6; i++) { const e = spawnEnemy(false); e.pos.set(rand(-R, R) * 0.6, rand(300, 800), rand(-R, R) * 0.6); }
@@ -1305,11 +1357,99 @@ function gameOver() {
   if (SFX.engGain) SFX.engGain.gain.value = 0;
   const nb = hits > best;
   if (nb) { best = hits; try { localStorage.setItem('allrange_best', best); } catch (e) {} }
-  document.getElementById('overHits').textContent = hits + ' HITS';
-  document.getElementById('overBest').textContent = nb ? 'NEW BEST!' : 'Best: ' + best;
+  document.getElementById('overHits').textContent = hits + (hits === 1 ? ' HIT' : ' HITS');
+  const m = Math.floor(runT / 60), sec = Math.floor(runT % 60);
+  document.getElementById('overStats').textContent = 'Survived ' + m + ':' + String(sec).padStart(2, '0') + ' · Threat level ' + threat;
+  document.getElementById('overBest').textContent = nb ? 'NEW PERSONAL BEST!' : 'Your best: ' + best;
   document.getElementById('best').textContent = best;
   document.getElementById('over').classList.remove('hidden');
+  lbShowGameOver(hits, runT);
 }
+
+/* =====================================================================
+   GLOBAL SCOREBOARD (shared JSON bin, top 10 by hits, time survived breaks ties)
+   ===================================================================== */
+const LB_URL = 'https://json.extendsclass.com/bin/__BIN_ID__';
+const LB_SIZE = 10;
+const lb = { board: [], score: 0, secs: 0, mine: null, entering: false };
+const $ = id => document.getElementById(id);
+function lbEntering() { return lb.entering; }
+const lbName = n => String(n || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 3);
+function lbClean(list) {
+  return (Array.isArray(list) ? list : [])
+    .filter(e => e && Number.isFinite(e.s) && e.s > 0)
+    .map(e => ({ n: lbName(e.n) || '???', s: Math.floor(e.s), t: Math.floor(e.t || 0), d: e.d || 0 }))
+    .sort((a, b) => b.s - a.s || b.t - a.t)
+    .slice(0, LB_SIZE);
+}
+async function lbFetch() {
+  const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 6000);
+  try {
+    const r = await fetch(LB_URL, { signal: ctl.signal, cache: 'no-store' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return lbClean(await r.json());
+  } finally { clearTimeout(timer); }
+}
+function lbRender() {
+  const ol = $('lbList'); ol.textContent = '';
+  for (let i = 0; i < LB_SIZE; i++) {
+    const e = lb.board[i], li = document.createElement('li');
+    const fmt = t => Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0');
+    li.innerHTML = '<span></span><span></span><span class="sc"></span>';
+    li.children[0].textContent = (i + 1) + '.';
+    if (e) {
+      li.children[1].textContent = e.n;
+      li.children[2].textContent = e.s + (e.t ? '  ' + fmt(e.t) : '');
+      if (lb.mine && e.d === lb.mine.d && e.n === lb.mine.n && e.s === lb.mine.s) li.className = 'me';
+    } else { li.children[1].textContent = '---'; li.className = 'empty'; }
+    ol.appendChild(li);
+  }
+}
+async function lbShowGameOver(score, secs) {
+  document.querySelector('.lbBox').classList.toggle('hidden', !LB_URL.indexOf || LB_URL.includes('__BIN'));
+  if (LB_URL.includes('__BIN')) return; // scoreboard not connected yet
+  lb.score = score; lb.secs = Math.floor(secs); lb.mine = null; lb.entering = false;
+  $('lbEntry').classList.add('hidden');
+  $('lbStatus').textContent = 'Loading global scores…';
+  lbRender();
+  try {
+    lb.board = await lbFetch();
+    lbRender();
+    const qualifies = score > 0 && (lb.board.length < LB_SIZE || score > lb.board[lb.board.length - 1].s);
+    $('lbStatus').textContent = qualifies ? '' : (score > 0 ? 'Down ' + lb.board[LB_SIZE - 1].s + ' hits to make the board.' : '');
+    if (qualifies && state === 'over') {
+      lb.entering = true;
+      $('lbEntry').classList.remove('hidden');
+      $('lbSubmit').disabled = false;
+      const inp = $('initials'); inp.value = '';
+      if (!TOUCH) inp.focus();
+    }
+  } catch (err) {
+    $('lbStatus').textContent = "Couldn't reach the scoreboard. Check your connection.";
+  }
+}
+async function lbSubmit() {
+  const n = lbName($('initials').value);
+  if (!n) { $('lbStatus').textContent = 'Type 1 to 3 letters first.'; $('initials').focus(); return; }
+  $('lbSubmit').disabled = true; $('initials').blur();
+  $('lbStatus').textContent = 'Saving…';
+  try {
+    const fresh = await lbFetch(); // merge with the latest board in case someone else just saved
+    const mine = { n, s: lb.score, t: lb.secs, d: Date.now() };
+    const merged = lbClean([...fresh, mine]);
+    const r = await fetch(LB_URL, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(merged) });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    lb.board = merged; lb.mine = mine; lb.entering = false;
+    $('lbEntry').classList.add('hidden');
+    $('lbStatus').textContent = merged.some(e => e.d === mine.d) ? 'Saved! You\'re on the board.' : 'Saved, but someone just beat you to it.';
+    lbRender();
+  } catch (err) {
+    $('lbSubmit').disabled = false;
+    $('lbStatus').textContent = "Couldn't save. Check your connection and try again.";
+  }
+}
+$('lbEntry').addEventListener('submit', e => { e.preventDefault(); lbSubmit(); });
+$('initials').addEventListener('input', e => { const v = lbName(e.target.value); if (e.target.value !== v) e.target.value = v; });
 function setPause(on) {
   if (on && state === 'play') { state = 'pause'; document.getElementById('pause').classList.remove('hidden'); if (SFX.engGain) SFX.engGain.gain.value = 0; }
   else if (!on && state === 'pause') { actx(); state = 'play'; document.getElementById('pause').classList.add('hidden'); }
@@ -1439,7 +1579,7 @@ function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
   const inp = gatherInput();
-  if ((state === 'title' || state === 'over') && edge.start) startGame();
+  if ((state === 'title' || (state === 'over' && !lbEntering())) && edge.start) startGame();
   else if (edge.pause) setPause(state === 'play');
   if (state === 'play' && edge.cam) camMode = 1 - camMode;
   syncTouchUI();
@@ -1447,6 +1587,14 @@ function frame(now) {
   carrier.rotation.y += dt * 0.05;
   if (state === 'play') {
     time += dt;
+    if (!P.dead) runT += dt;
+    D = Math.min(1.6, runT / 180);
+    const th = 1 + Math.floor(runT / 30);
+    if (th > threat) {
+      threat = th;
+      say('CONTROL', 'Threat level ' + threat + '! The carrier is launching more fighters!', '#ff9a50');
+      beep(300, 600, 0.3, 'square', 0.12);
+    }
     updatePlayer(dt, inp);
     updateEnemies(dt);
     updateShots(dt);
