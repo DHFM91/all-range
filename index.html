@@ -28,6 +28,10 @@
   .panel{background:rgba(0,0,0,.45);border:2px solid #3b6fd8;border-radius:6px;padding:14px 22px;max-width:640px;
     display:grid;grid-template-columns:auto auto;gap:4px 22px;text-align:left;font-size:14px}
   .panel b{color:#ffd84a;font-weight:700}
+  .panel .ph{color:#9fd3ff;font-size:11px;font-weight:800;letter-spacing:.18em;margin-top:6px}
+  .panel .ph:first-child{margin-top:0}
+  body.touch #mouseNote{display:none}
+  @media (max-height:700px){ .panel{font-size:12.5px;gap:2px 18px;padding:10px 18px} }
   .btn{margin-top:22px;font-size:22px;font-style:italic;font-weight:800;letter-spacing:.12em;color:#111;background:#ffd84a;
     border:none;padding:10px 26px;border-radius:4px;cursor:pointer;box-shadow:4px 4px 0 #c0392b}
   .btn:hover{background:#fff07a}
@@ -116,32 +120,36 @@
   <h1>ALL-RANGE</h1>
   <div class="sub">working title</div>
   <div class="panel">
-    <span><b>WASD / Arrows</b></span><span>Steer (T toggles inverted pitch)</span>
-    <span><b>Space / J</b></span><span>Fire — hold to charge, lock on, release</span>
-    <span><b>B / K</b></span><span>Bomb (press again to detonate)</span>
-    <span><b>Shift</b></span><span>Boost</span>
-    <span><b>Z</b></span><span>Brake</span>
-    <span><b>Q / E</b></span><span>Bank for tight turns</span>
-    <span><b>C</b></span><span>Deflector shield — bounces enemy fire back</span>
-    <span><b>R</b> or Pull up + Boost</span><span>Somersault (loop behind a pursuer)</span>
-    <span><b>F</b> or Pull up + Brake</span><span>U-turn</span>
-    <span><b>V</b></span><span>Camera (chase / cockpit)</span>
-    <span><b>M</b> &nbsp; <b>P / Esc</b></span><span>Mute &nbsp;·&nbsp; Pause</span>
+    <span class="ph">MOUSE + KEYBOARD</span><span class="ph"></span>
+    <span><b>Mouse</b></span><span>Aim — the nose follows the cursor</span>
+    <span><b>Left click</b></span><span>Fire — hold to charge, lock on, release</span>
+    <span><b>Right click</b></span><span>Shield — bounces enemy fire back</span>
+    <span><b>Wheel up / down</b></span><span>Loop (get behind a pursuer) / U-turn</span>
+    <span><b>W / S</b></span><span>Boost / Brake</span>
+    <span><b>A / D</b></span><span>Bank for tight turns</span>
+    <span><b>Space</b> or <b>middle click</b></span><span>Bomb (press again to detonate)</span>
+    <span><b>[ / ]</b></span><span>Mouse sensitivity &nbsp;·&nbsp; <b>T</b> invert pitch</span>
+    <span class="ph">KEYBOARD ONLY</span><span class="ph"></span>
+    <span><b>WASD / Arrows</b></span><span>Steer &nbsp;·&nbsp; <b>Space / J</b> fire &nbsp;·&nbsp; <b>B</b> bomb &nbsp;·&nbsp; <b>C</b> shield</span>
+    <span><b>Shift / Z</b></span><span>Boost / Brake &nbsp;·&nbsp; <b>Q / E</b> bank &nbsp;·&nbsp; <b>R</b> loop &nbsp;·&nbsp; <b>F</b> U-turn</span>
+    <span class="ph">ANY TIME</span><span class="ph"></span>
+    <span><b>V</b> &nbsp; <b>M</b> &nbsp; <b>P / Esc</b></span><span>Camera &nbsp;·&nbsp; Mute &nbsp;·&nbsp; Pause</span>
     <span><b>Gamepad</b></span><span>Stick steer · A fire · X bomb · RT/LT boost/brake · LB/RB bank · Left stick click shield · Y loop · B U-turn</span>
   </div>
+  <div class="note" id="mouseNote">Click <b>START</b> and the game captures your mouse for aiming. Press Esc to let it go.</div>
   <div id="touchHelp">
     <b>Left thumb:</b> touch anywhere on the left side and drag to steer. Push all the way left or right for a tight turn.<br>
     <b>Right thumb:</b> hold <b>FIRE</b> to charge a lock-on shot. <b>SHIELD</b> bounces enemy fire back. <b>LOOP</b> gets you behind a pursuer.
   </div>
   <div id="rotateHint">Turn your phone sideways for the best view.</div>
   <div id="iosHint" class="note hidden">For true fullscreen on iPhone: tap Share, then <b>Add to Home Screen</b>.</div>
-  <button class="btn" id="startBtn">PRESS ENTER</button>
+  <button class="btn" id="startBtn">START</button>
   <div class="note">Best: <span id="best">0</span> hits</div>
 </div>
 
 <div id="pause" class="overlay hidden">
   <h1>PAUSED</h1>
-  <div class="note">P / Esc or tap to resume</div>
+  <div class="note">Click or tap to resume · P to resume without the mouse</div>
 </div>
 
 <div id="over" class="overlay hidden">
@@ -522,13 +530,18 @@ addEventListener('keydown', e => {
   if (BLOCK.has(e.code)) e.preventDefault();
   if (e.repeat) return;
   if (e.code === 'KeyT') { invertY = !invertY; say('SYSTEM', invertY ? 'Inverted pitch ON (up = nose down).' : 'Inverted pitch OFF (up = nose up).', '#ffd84a'); }
+  if (e.code === 'BracketLeft' || e.code === 'BracketRight') {
+    MOUSE.sens = clamp(MOUSE.sens * (e.code === 'BracketRight' ? 1.15 : 1 / 1.15), 0.0006, 0.008);
+    try { localStorage.setItem('allrange_sens', MOUSE.sens); } catch (err) {}
+    say('SYSTEM', 'Mouse sensitivity ' + Math.round(MOUSE.sens / 0.0022 * 100) + '%', '#ffd84a');
+  }
   if (e.code === 'KeyM') { SFX.on = !SFX.on; if (SFX.master) SFX.master.gain.value = SFX.on ? 0.35 : 0; }
   if ((e.code === 'Enter' || e.code === 'NumpadEnter') && (state === 'title' || (state === 'over' && !lbEntering()))) startGame();
 });
 addEventListener('keyup', e => { keys[e.code] = false; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; if (state === 'play') setPause(true); });
-document.getElementById('startBtn').onclick = () => startGame();
-document.getElementById('againBtn').onclick = () => { lb.entering = false; startGame(); };
+document.getElementById('startBtn').onclick = () => { startGame(); requestAim(); };
+document.getElementById('againBtn').onclick = () => { lb.entering = false; startGame(); requestAim(); };
 
 function readPad() {
   const pads = navigator.getGamepads ? navigator.getGamepads() : [];
@@ -541,20 +554,32 @@ function gatherInput() {
   const k = keys, gp = readPad();
   const b = i => !!(gp && gp.buttons[i] && (gp.buttons[i].pressed || gp.buttons[i].value > 0.5));
   const ax = i => { const v = gp ? gp.axes[i] || 0 : 0; return Math.abs(v) < 0.18 ? 0 : v; };
-  let up = ((k.KeyW || k.ArrowUp) ? 1 : 0) - ((k.KeyS || k.ArrowDown) ? 1 : 0);
+  // mouse aim: while the mouse is captured, WASD become throttle/bank and the mouse steers
+  const ml = MOUSE.locked && state === 'play';
+  let up = ((!ml && k.KeyW) || k.ArrowUp ? 1 : 0) - ((!ml && k.KeyS) || k.ArrowDown ? 1 : 0);
   let padUp = -ax(1), touchUp = TI.y;
   if (invertY) { up = -up; padUp = -padUp; touchUp = -touchUp; }
+  let mPitch = 0, mTurn = 0;
+  if (ml) {
+    if (P.man || P.dead) resetAim(); // aim follows the ship through loops, U-turns and respawns
+    else {
+      clampAim();
+      mTurn = clamp(wrapAng(MOUSE.aimYaw - P.yaw) * 3.2, -1, 1);
+      mPitch = clamp((MOUSE.aimPitch - P.pitch) * 3.2, -1, 1);
+    }
+  }
   const inp = {
-    pitch: clamp(up + padUp + touchUp, -1, 1),
-    turn: clamp(((k.KeyA || k.ArrowLeft) ? 1 : 0) - ((k.KeyD || k.ArrowRight) ? 1 : 0) - ax(0) - TI.x, -1, 1),
-    fire: !!(k.Space || k.KeyJ || b(0) || TI.fire),
-    boost: !!(k.ShiftLeft || k.ShiftRight || b(7) || TI.boost),
-    brake: !!(k.KeyZ || b(6) || TI.brake),
+    mouseAim: ml,
+    pitch: clamp(up + padUp + touchUp + mPitch, -1, 1),
+    turn: clamp(((!ml && k.KeyA) || k.ArrowLeft ? 1 : 0) - ((!ml && k.KeyD) || k.ArrowRight ? 1 : 0) - ax(0) - TI.x + mTurn, -1, 1),
+    fire: !!((k.Space && !ml) || k.KeyJ || b(0) || TI.fire || (ml && MOUSE.lmb)),
+    boost: !!(k.ShiftLeft || k.ShiftRight || b(7) || TI.boost || (ml && k.KeyW)),
+    brake: !!(k.KeyZ || b(6) || TI.brake || (ml && k.KeyS)),
     // touch: pushing the stick all the way sideways banks for a tight turn
-    bankL: !!(k.KeyQ || b(4) || TI.x < -0.9), bankR: !!(k.KeyE || b(5) || TI.x > 0.9),
-    shield: !!(k.KeyC || b(10) || TI.shield),
-    bomb: !!(k.KeyB || k.KeyK || b(2) || TI.bomb),
-    loop: !!(k.KeyR || b(3) || TI.loop), uturn: !!(k.KeyF || b(1) || TI.uturn),
+    bankL: !!(k.KeyQ || b(4) || TI.x < -0.9 || (ml && k.KeyA)), bankR: !!(k.KeyE || b(5) || TI.x > 0.9 || (ml && k.KeyD)),
+    shield: !!(k.KeyC || b(10) || TI.shield || (ml && MOUSE.rmb)),
+    bomb: !!(k.KeyB || k.KeyK || b(2) || TI.bomb || (ml && (k.Space || MOUSE.mmb))),
+    loop: !!(k.KeyR || b(3) || TI.loop || MOUSE.wheelUp), uturn: !!(k.KeyF || b(1) || TI.uturn || MOUSE.wheelDown),
     cam: !!(k.KeyV || b(8)), pause: !!(k.KeyP || k.Escape || b(9)),
     start: b(0) || b(9)
   };
@@ -564,6 +589,7 @@ function gatherInput() {
     released[key] = !inp[key] && prevIn[key];
   }
   prevIn = inp;
+  MOUSE.wheelUp = MOUSE.wheelDown = false; // wheel notches are one-shot
   return inp;
 }
 
@@ -747,6 +773,7 @@ function respawn() {
   P.g = 0; P.locked = false; P.dead = false; P.invuln = 3; P.activeBomb = null; lowWarned = false;
   ship.visible = true;
   snapCamera();
+  resetAim();
 }
 
 /* =====================================================================
@@ -762,8 +789,8 @@ function updatePlayer(dt, inp) {
   P.hurtCd = Math.max(0, P.hurtCd - dt);
 
   // --- action triggers
-  if (edge.loop || (edge.boost && inp.pitch > 0.5)) tryLoop();
-  if (edge.uturn || (edge.brake && inp.pitch > 0.5)) tryUturn(false);
+  if (edge.loop || (!inp.mouseAim && edge.boost && inp.pitch > 0.5)) tryLoop();
+  if (edge.uturn || (!inp.mouseAim && edge.brake && inp.pitch > 0.5)) tryUturn(false);
   if (edge.shield) raiseShield();
   if (edge.bomb) fireBomb();
   if (edge.fire) fireLaser();
@@ -814,7 +841,7 @@ function updatePlayer(dt, inp) {
     }
   } else {
     P.pitch += inp.pitch * 1.5 * dt;
-    if (!inp.pitch) P.pitch -= P.pitch * Math.min(1, dt * 1.1);
+    if (!inp.pitch && !inp.mouseAim) P.pitch -= P.pitch * Math.min(1, dt * 1.1);
     P.pitch = clamp(P.pitch, -1.25, 1.25);
     let tr = 1.35;
     if ((inp.bankL && inp.turn > 0) || (inp.bankR && inp.turn < 0)) tr = 2.4;
@@ -899,7 +926,7 @@ function updatePlayer(dt, inp) {
     if (T1.lengthSq() < 320 * 320 && T1.dot(P.fwd) < 0) { tailed = true; break; }
   }
   P.tailT = tailed ? P.tailT + dt : 0;
-  if (P.tailT > 1.5 && tailWarnCd <= 0) { tailWarnCd = 18; say('CONTROL', 'Enemy on your tail! ' + (TOUCH ? 'Hit LOOP' : 'Loop (R)') + ' to get behind it!'); }
+  if (P.tailT > 1.5 && tailWarnCd <= 0) { tailWarnCd = 18; say('CONTROL', 'Enemy on your tail! ' + (TOUCH ? 'Hit LOOP' : MOUSE.locked ? 'Wheel up to loop' : 'Loop (R)') + ' to get behind it!'); }
 }
 
 /* =====================================================================
@@ -1223,6 +1250,21 @@ function drawHUD() {
         txt('LOCK', lp.x, lp.y - 32, '#ff5050', 13, 'center');
       }
     }
+    // mouse aim cursor: where the nose is heading
+    if (MOUSE.locked && !P.man) {
+      const cp = Math.cos(MOUSE.aimPitch);
+      T3.set(-Math.sin(MOUSE.aimYaw) * cp, Math.sin(MOUSE.aimPitch), -Math.cos(MOUSE.aimYaw) * cp);
+      const ap = project(T1.copy(P.pos).addScaledVector(T3, 230));
+      if (ap) {
+        hx.strokeStyle = 'rgba(255,255,255,.9)'; hx.lineWidth = 2;
+        hx.beginPath(); hx.arc(ap.x, ap.y, 11, 0, Math.PI * 2); hx.stroke();
+        hx.fillStyle = '#fff'; hx.beginPath(); hx.arc(ap.x, ap.y, 2.2, 0, Math.PI * 2); hx.fill();
+        if (far) {
+          hx.strokeStyle = 'rgba(255,255,255,.25)'; hx.setLineDash([4, 5]);
+          hx.beginPath(); hx.moveTo(far.x, far.y); hx.lineTo(ap.x, ap.y); hx.stroke(); hx.setLineDash([]);
+        }
+      }
+    }
     // rival marker
     for (const e of enemies) if (e.rival && e.alive) {
       const rp = project(e.pos);
@@ -1254,6 +1296,7 @@ function drawHUD() {
   // hits (top-center)
   txt('HITS', W / 2, 18, '#ffd84a', 13, 'center');
   txt(String(hits).padStart(3, '0'), W / 2, 42, '#ffffff', 28, 'center');
+  if (!MOUSE.locked && !TOUCH && canLock() && !P.dead) txt('Click to aim with the mouse', W / 2, 86, 'rgba(255,255,255,.75)', 13, 'center');
   txt('THREAT ' + threat, W / 2, 66, threat >= 7 ? '#ff6040' : threat >= 4 ? '#ffb040' : '#9fd3ff', 12, 'center');
 
   // lives & laser (bottom-left)
@@ -1344,7 +1387,7 @@ function startGame() {
   for (const id of ['title', 'over', 'pause']) document.getElementById(id).classList.add('hidden');
   say('CONTROL', "The carrier is holding over the base. Clear its fighters out of the sky!");
   say('CONTROL', TOUCH ? 'Hold FIRE to charge a lock-on shot. Tap SHIELD to bounce their shots back.'
-                       : 'Hold FIRE to charge a lock-on shot. Tap C to raise your deflector and bounce their shots back.');
+                       : 'Hold left click to charge a lock-on shot. Right click raises your shield and bounces their shots back.');
   if (TOUCH && !document.fullscreenElement && !document.webkitFullscreenElement) {
     const de = document.documentElement;
     try {
@@ -1354,6 +1397,7 @@ function startGame() {
   }
 }
 function gameOver() {
+  if (document.pointerLockElement) document.exitPointerLock();
   state = 'over';
   if (SFX.engGain) SFX.engGain.gain.value = 0;
   const nb = hits > best;
@@ -1450,7 +1494,7 @@ async function lbSubmit() {
 $('lbEntry').addEventListener('submit', e => { e.preventDefault(); lbSubmit(); });
 $('initials').addEventListener('input', e => { const v = lbName(e.target.value); if (e.target.value !== v) e.target.value = v; });
 function setPause(on) {
-  if (on && state === 'play') { state = 'pause'; document.getElementById('pause').classList.remove('hidden'); if (SFX.engGain) SFX.engGain.gain.value = 0; }
+  if (on && state === 'play') { if (document.pointerLockElement) document.exitPointerLock(); state = 'pause'; document.getElementById('pause').classList.remove('hidden'); if (SFX.engGain) SFX.engGain.gain.value = 0; }
   else if (!on && state === 'pause') { actx(); state = 'play'; document.getElementById('pause').classList.add('hidden'); }
 }
 
@@ -1568,7 +1612,66 @@ document.querySelectorAll('#touch .tb').forEach(btn => {
   btn.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') lift(); });
 });
 document.getElementById('touch').addEventListener('contextmenu', e => e.preventDefault());
-document.getElementById('pause').addEventListener('click', () => setPause(false));
+document.getElementById('pause').addEventListener('click', () => { setPause(false); requestAim(); });
+
+/* =====================================================================
+   MOUSE AIM (desktop): pointer lock, the nose chases an aim point in the sky
+   ===================================================================== */
+const MOUSE = { locked: false, aimYaw: 0, aimPitch: 0, lmb: false, rmb: false, mmb: false,
+  wheelUp: false, wheelDown: false, wheelT: 0, lostT: -1e9, sens: 0.0022 };
+try { const sv = +localStorage.getItem('allrange_sens'); if (sv > 0) MOUSE.sens = clamp(sv, 0.0006, 0.008); } catch (e) {}
+const wrapAng = a => Math.atan2(Math.sin(a), Math.cos(a));
+function canLock() { return !TOUCH && !!renderer.domElement.requestPointerLock; }
+function resetAim() { MOUSE.aimYaw = P.yaw; MOUSE.aimPitch = P.pitch; }
+function clampAim() {
+  // keep the aim point within reach of the nose so the cursor stays on screen
+  MOUSE.aimYaw = P.yaw + clamp(wrapAng(MOUSE.aimYaw - P.yaw), -0.7, 0.7);
+  MOUSE.aimPitch = clamp(clamp(MOUSE.aimPitch, P.pitch - 0.6, P.pitch + 0.6), -1.2, 1.2);
+}
+function requestAim() {
+  if (!canLock() || document.pointerLockElement || state !== 'play') return;
+  const el = renderer.domElement;
+  try {
+    const r = el.requestPointerLock({ unadjustedMovement: true });
+    if (r && r.catch) r.catch(() => { try { const r2 = el.requestPointerLock(); if (r2 && r2.catch) r2.catch(() => {}); } catch (e) {} });
+  } catch (e) { try { el.requestPointerLock(); } catch (e2) {} }
+}
+document.addEventListener('pointerlockchange', () => {
+  MOUSE.locked = document.pointerLockElement === renderer.domElement;
+  MOUSE.lmb = MOUSE.rmb = MOUSE.mmb = false;
+  if (MOUSE.locked) resetAim();
+  else { MOUSE.lostT = performance.now(); if (state === 'play') setPause(true); }
+});
+addEventListener('mousemove', e => {
+  if (!MOUSE.locked || state !== 'play' || P.man || P.dead) return;
+  MOUSE.aimYaw -= e.movementX * MOUSE.sens;
+  MOUSE.aimPitch += (invertY ? 1 : -1) * e.movementY * MOUSE.sens;
+  clampAim();
+});
+renderer.domElement.addEventListener('mousedown', e => {
+  if (TOUCH) return;
+  if (!MOUSE.locked) { if (state === 'play') requestAim(); return; }
+  e.preventDefault();
+  if (e.button === 0) MOUSE.lmb = true;
+  else if (e.button === 2) MOUSE.rmb = true;
+  else if (e.button === 1) MOUSE.mmb = true;
+});
+addEventListener('mouseup', e => {
+  if (e.button === 0) MOUSE.lmb = false;
+  else if (e.button === 2) MOUSE.rmb = false;
+  else if (e.button === 1) MOUSE.mmb = false;
+});
+addEventListener('wheel', e => {
+  if (state !== 'play') return;
+  e.preventDefault();
+  if (!MOUSE.locked) return;
+  const now = performance.now();
+  if (now - MOUSE.wheelT < 400 || !e.deltaY) return; // one move per flick of the wheel
+  MOUSE.wheelT = now;
+  if (e.deltaY < 0) MOUSE.wheelUp = true; else MOUSE.wheelDown = true;
+}, { passive: false });
+addEventListener('contextmenu', e => { if (!TOUCH && (MOUSE.locked || state === 'play')) e.preventDefault(); });
+renderer.domElement.addEventListener('auxclick', e => e.preventDefault());
 
 /* =====================================================================
    MAIN LOOP
@@ -1579,7 +1682,7 @@ function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
   const inp = gatherInput();
   if ((state === 'title' || (state === 'over' && !lbEntering())) && edge.start) startGame();
-  else if (edge.pause) setPause(state === 'play');
+  else if (edge.pause && performance.now() - MOUSE.lostT > 500) setPause(state === 'play');
   if (state === 'play' && edge.cam) camMode = 1 - camMode;
   syncTouchUI();
 

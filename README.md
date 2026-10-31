@@ -6,20 +6,35 @@ A free-flight 3D arcade dogfighter that runs in your browser. Fly anywhere insid
 
 ## Controls
 
+### Mouse + keyboard (recommended)
+
+Click **START** and the game captures your mouse for aiming (press Esc to release it).
+
+| Input | Action |
+| --- | --- |
+| Mouse | Aim. The nose follows the cursor |
+| Left click | Fire. Hold to charge, lock on, release |
+| Right click | Shield (bounces enemy fire back) |
+| Wheel up / down | Loop (get behind a pursuer) / U-turn |
+| W / S | Boost / Brake |
+| A / D | Bank for tight turns |
+| Space or middle click | Bomb (press again to detonate) |
+| [ / ] | Mouse sensitivity down / up |
+| T | Invert pitch |
+
+### Keyboard only
+
 | Key | Action |
 | --- | --- |
-| WASD / Arrows | Steer (T toggles inverted pitch) |
+| WASD / Arrows | Steer |
 | Space / J | Fire. Hold to charge, lock on, release |
-| B / K | Bomb (press again to detonate) |
-| Shift | Boost |
-| Z | Brake |
+| B | Bomb (press again to detonate) |
+| C | Shield |
+| Shift / Z | Boost / Brake |
 | Q / E | Bank for tight turns |
-| C | Deflector shield (bounces enemy fire back) |
-| R, or pull up + boost | Loop (get behind a pursuer) |
-| F, or pull up + brake | U-turn |
-| V | Camera (chase / cockpit) |
-| M | Mute |
-| P / Esc | Pause |
+| R / F | Loop / U-turn |
+
+**Any time:** V camera, M mute, P or Esc pause.
 
 Gamepads work too: left stick steers, A fires, X bombs, RT/LT boost and brake, LB/RB bank, left stick click raises the shield, Y loops, B U-turns.
 
