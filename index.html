@@ -1215,7 +1215,7 @@ function drawHUD() {
   if (P.dead && P.lives > 0) txt('SHIP DOWN', W / 2, H * 0.4, '#ff6040', 34, 'center');
 
   // radar (bottom-right)
-  const rr = TOUCH ? 44 : small ? 58 : 82, cx = W - rr - 20, cy = TOUCH ? 82 + rr : H - rr - 20, s = rr / (R * 1.08);
+  const rr = TOUCH ? (H < 430 ? 36 : 44) : small ? 58 : 82, cx = W - rr - 20, cy = TOUCH ? 78 + rr : H - rr - 20, s = rr / (R * 1.08);
   hx.fillStyle = 'rgba(0,30,15,.6)'; hx.beginPath(); hx.arc(cx, cy, rr, 0, Math.PI * 2); hx.fill();
   hx.strokeStyle = '#3fd06a'; hx.lineWidth = 2; hx.stroke();
   hx.strokeStyle = 'rgba(63,208,106,.35)'; hx.lineWidth = 1;
