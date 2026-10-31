@@ -23,6 +23,10 @@ A free-flight 3D arcade dogfighter that runs in your browser. Fly anywhere insid
 
 Gamepads work too: left stick steers, A fires, X bombs, RT/LT boost and brake, LB/RB bank, left stick click raises the shield, Y loops, B U-turns.
 
+## On a phone or tablet
+
+Touch controls appear automatically. Drag anywhere on the left side to steer (push all the way sideways for a tight turn). The right thumb gets FIRE (hold to charge a lock-on shot), SHIELD, BOOST, BRAKE, BOMB, LOOP and U-TURN. Landscape works best.
+
 ## Running it locally
 
 Download `index.html` and open it in a browser. It needs an internet connection the first time, because the 3D engine ([Three.js](https://threejs.org)) loads from a CDN.

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>All-Range</title>
 <style>
   html,body{margin:0;height:100%;overflow:hidden;background:#000;font-family:'Segoe UI',Tahoma,Arial,sans-serif;user-select:none}
@@ -22,10 +22,59 @@
   .btn:hover{background:#fff07a}
   .note{margin-top:12px;color:#9fd3ff;font-size:13px}
   .big{font-size:28px;margin:.3em 0}
+
+  /* ---------- touch controls ---------- */
+  #touch{position:fixed;inset:0;z-index:3;display:none;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+  body.touch{touch-action:none;-webkit-touch-callout:none}
+  body.touch .overlay{touch-action:manipulation}
+  body.touch.playing #touch{display:block}
+  #stickZone{position:absolute;left:0;bottom:0;width:48%;height:72%}
+  #stickGhost,#stickBase{position:absolute;width:130px;height:130px;border-radius:50%;border:3px solid rgba(255,255,255,.4);background:rgba(0,10,30,.22);pointer-events:none}
+  #stickGhost{left:calc(36px + env(safe-area-inset-left,0px));bottom:calc(40px + env(safe-area-inset-bottom,0px));opacity:.55;
+    display:flex;align-items:center;justify-content:center;color:#fff;font:italic 800 13px 'Segoe UI',Tahoma,sans-serif;letter-spacing:.15em}
+  #stickBase{display:none;margin:-65px 0 0 -65px}
+  #stickKnob{position:absolute;left:50%;top:50%;width:60px;height:60px;margin:-30px 0 0 -30px;border-radius:50%;
+    background:rgba(255,216,74,.6);border:2px solid #fff;box-shadow:0 0 12px rgba(0,0,0,.4)}
+  body.stick-on #stickGhost{display:none}
+  .tb{position:absolute;border-radius:50%;border:2px solid rgba(255,255,255,.6);background:rgba(0,10,30,.32);color:#fff;
+    font:italic 800 12px 'Segoe UI',Tahoma,sans-serif;letter-spacing:.04em;display:flex;align-items:center;justify-content:center;
+    text-align:center;line-height:1.1;text-shadow:1px 1px 0 #000;touch-action:none}
+  .tb.on{background:rgba(255,216,74,.7);color:#111;text-shadow:none;transform:scale(.94)}
+  .tb small{display:block;font-size:9px;font-weight:600;opacity:.85}
+  #tFire{width:96px;height:96px;right:calc(22px + env(safe-area-inset-right,0px));bottom:calc(30px + env(safe-area-inset-bottom,0px));
+    border-color:#6cff6c;font-size:16px}
+  #tShield{width:62px;height:62px;right:calc(39px + env(safe-area-inset-right,0px));bottom:calc(144px + env(safe-area-inset-bottom,0px));border-color:#7fe8ff}
+  #tBoost{width:62px;height:62px;right:calc(128px + env(safe-area-inset-right,0px));bottom:calc(108px + env(safe-area-inset-bottom,0px));border-color:#3f8cff}
+  #tBomb{width:58px;height:58px;right:calc(134px + env(safe-area-inset-right,0px));bottom:calc(26px + env(safe-area-inset-bottom,0px));border-color:#ff8080}
+  #tBrake{width:54px;height:54px;right:calc(206px + env(safe-area-inset-right,0px));bottom:calc(52px + env(safe-area-inset-bottom,0px))}
+  #tLoop{width:50px;height:50px;right:calc(206px + env(safe-area-inset-right,0px));bottom:calc(132px + env(safe-area-inset-bottom,0px));font-size:11px}
+  #tUturn{width:50px;height:50px;right:calc(120px + env(safe-area-inset-right,0px));bottom:calc(190px + env(safe-area-inset-bottom,0px));font-size:11px}
+  #tPause{width:44px;height:44px;border-radius:8px;top:calc(8px + env(safe-area-inset-top,0px));left:calc(50% + 62px);font-size:15px;font-style:normal}
+  #touchHelp{display:none;max-width:420px;margin:0 16px;font-size:14px;line-height:1.45;color:#dbe9ff;background:rgba(0,0,0,.45);
+    border:2px solid #3b6fd8;border-radius:6px;padding:12px 16px;text-align:left}
+  #touchHelp b{color:#ffd84a}
+  #rotateHint{display:none;margin-top:10px;color:#ffd84a;font-size:13px}
+  body.touch #title .panel{display:none}
+  body.touch #touchHelp{display:block}
+  @media (orientation:portrait){ body.touch #rotateHint{display:block} }
 </style>
 </head>
 <body>
 <canvas id="hud"></canvas>
+
+<div id="touch">
+  <div id="stickZone"></div>
+  <div id="stickGhost">STEER</div>
+  <div id="stickBase"><div id="stickKnob"></div></div>
+  <div class="tb" id="tFire" data-k="fire">FIRE<small>hold to lock</small></div>
+  <div class="tb" id="tShield" data-k="shield">SHIELD</div>
+  <div class="tb" id="tBoost" data-k="boost">BOOST</div>
+  <div class="tb" id="tBomb" data-k="bomb">BOMB</div>
+  <div class="tb" id="tBrake" data-k="brake">BRAKE</div>
+  <div class="tb" id="tLoop" data-k="loop">LOOP</div>
+  <div class="tb" id="tUturn" data-k="uturn">U-TURN</div>
+  <div class="tb" id="tPause" data-k="pause">II</div>
+</div>
 
 <div id="title" class="overlay">
   <h1>ALL-RANGE</h1>
@@ -44,13 +93,18 @@
     <span><b>M</b> &nbsp; <b>P / Esc</b></span><span>Mute &nbsp;·&nbsp; Pause</span>
     <span><b>Gamepad</b></span><span>Stick steer · A fire · X bomb · RT/LT boost/brake · LB/RB bank · Left stick click shield · Y loop · B U-turn</span>
   </div>
+  <div id="touchHelp">
+    <b>Left thumb:</b> touch anywhere on the left side and drag to steer. Push all the way left or right for a tight turn.<br>
+    <b>Right thumb:</b> hold <b>FIRE</b> to charge a lock-on shot. <b>SHIELD</b> bounces enemy fire back. <b>LOOP</b> gets you behind a pursuer.
+  </div>
+  <div id="rotateHint">Turn your phone sideways for the best view.</div>
   <button class="btn" id="startBtn">PRESS ENTER</button>
   <div class="note">Best: <span id="best">0</span> hits</div>
 </div>
 
 <div id="pause" class="overlay hidden">
   <h1>PAUSED</h1>
-  <div class="note">P / Esc to resume</div>
+  <div class="note">P / Esc or tap to resume</div>
 </div>
 
 <div id="over" class="overlay hidden">
@@ -426,18 +480,19 @@ function gatherInput() {
   const b = i => !!(gp && gp.buttons[i] && (gp.buttons[i].pressed || gp.buttons[i].value > 0.5));
   const ax = i => { const v = gp ? gp.axes[i] || 0 : 0; return Math.abs(v) < 0.18 ? 0 : v; };
   let up = ((k.KeyW || k.ArrowUp) ? 1 : 0) - ((k.KeyS || k.ArrowDown) ? 1 : 0);
-  let padUp = -ax(1);
-  if (invertY) { up = -up; padUp = -padUp; }
+  let padUp = -ax(1), touchUp = TI.y;
+  if (invertY) { up = -up; padUp = -padUp; touchUp = -touchUp; }
   const inp = {
-    pitch: clamp(up + padUp, -1, 1),
-    turn: clamp(((k.KeyA || k.ArrowLeft) ? 1 : 0) - ((k.KeyD || k.ArrowRight) ? 1 : 0) - ax(0), -1, 1),
-    fire: !!(k.Space || k.KeyJ || b(0)),
-    boost: !!(k.ShiftLeft || k.ShiftRight || b(7)),
-    brake: !!(k.KeyZ || b(6)),
-    bankL: !!(k.KeyQ || b(4)), bankR: !!(k.KeyE || b(5)),
-    shield: !!(k.KeyC || b(10)),
-    bomb: !!(k.KeyB || k.KeyK || b(2)),
-    loop: !!(k.KeyR || b(3)), uturn: !!(k.KeyF || b(1)),
+    pitch: clamp(up + padUp + touchUp, -1, 1),
+    turn: clamp(((k.KeyA || k.ArrowLeft) ? 1 : 0) - ((k.KeyD || k.ArrowRight) ? 1 : 0) - ax(0) - TI.x, -1, 1),
+    fire: !!(k.Space || k.KeyJ || b(0) || TI.fire),
+    boost: !!(k.ShiftLeft || k.ShiftRight || b(7) || TI.boost),
+    brake: !!(k.KeyZ || b(6) || TI.brake),
+    // touch: pushing the stick all the way sideways banks for a tight turn
+    bankL: !!(k.KeyQ || b(4) || TI.x < -0.9), bankR: !!(k.KeyE || b(5) || TI.x > 0.9),
+    shield: !!(k.KeyC || b(10) || TI.shield),
+    bomb: !!(k.KeyB || k.KeyK || b(2) || TI.bomb),
+    loop: !!(k.KeyR || b(3) || TI.loop), uturn: !!(k.KeyF || b(1) || TI.uturn),
     cam: !!(k.KeyV || b(8)), pause: !!(k.KeyP || k.Escape || b(9)),
     start: b(0) || b(9)
   };
@@ -779,7 +834,7 @@ function updatePlayer(dt, inp) {
     if (T1.lengthSq() < 320 * 320 && T1.dot(P.fwd) < 0) { tailed = true; break; }
   }
   P.tailT = tailed ? P.tailT + dt : 0;
-  if (P.tailT > 1.5 && tailWarnCd <= 0) { tailWarnCd = 18; say('CONTROL', 'Enemy on your tail! Somersault (R) to get behind it!'); }
+  if (P.tailT > 1.5 && tailWarnCd <= 0) { tailWarnCd = 18; say('CONTROL', 'Enemy on your tail! ' + (TOUCH ? 'Hit LOOP' : 'Loop (R)') + ' to get behind it!'); }
 }
 
 /* =====================================================================
@@ -1120,8 +1175,10 @@ function drawHUD() {
   txt(String(hits).padStart(3, '0'), W / 2, 42, '#ffffff', 28, 'center');
 
   // lives & laser (bottom-left)
-  txt('SHIPS × ' + Math.max(0, P.lives), 20, H - 48, '#9fd3ff', 16);
-  txt(['SINGLE', 'TWIN', 'HYPER'][P.laser] + ' LASER', 20, H - 24, P.laser === 2 ? '#66b0ff' : '#6cff6c', 14);
+  // on touch screens the bottom corners belong to the thumbs, so these move up top
+  const ly = TOUCH ? 96 : H - 48;
+  txt('SHIPS × ' + Math.max(0, P.lives), 20, ly, '#9fd3ff', 16);
+  txt(['SINGLE', 'TWIN', 'HYPER'][P.laser] + ' LASER', 20, ly + 22, P.laser === 2 ? '#66b0ff' : '#6cff6c', 14);
 
   // edge warning
   const hd = Math.hypot(P.pos.x, P.pos.z);
@@ -1129,7 +1186,7 @@ function drawHUD() {
   if (P.dead && P.lives > 0) txt('SHIP DOWN', W / 2, H * 0.4, '#ff6040', 34, 'center');
 
   // radar (bottom-right)
-  const rr = small ? 58 : 82, cx = W - rr - 20, cy = H - rr - 20, s = rr / (R * 1.08);
+  const rr = TOUCH ? 50 : small ? 58 : 82, cx = W - rr - 20, cy = TOUCH ? 88 + rr : H - rr - 20, s = rr / (R * 1.08);
   hx.fillStyle = 'rgba(0,30,15,.6)'; hx.beginPath(); hx.arc(cx, cy, rr, 0, Math.PI * 2); hx.fill();
   hx.strokeStyle = '#3fd06a'; hx.lineWidth = 2; hx.stroke();
   hx.strokeStyle = 'rgba(63,208,106,.35)'; hx.lineWidth = 1;
@@ -1153,7 +1210,12 @@ function drawHUD() {
 
   // comm box
   if (comm.cur) {
-    const w = Math.min(560, W - (small ? 40 : 2 * rr + 80)), h = 78, x = small ? 20 : (W - w) / 2, y = small ? 88 : H - h - 22;
+    let w = Math.min(560, W - (small ? 40 : 2 * rr + 80)), h = 78, x = small ? 20 : (W - w) / 2, y = small ? 88 : H - h - 22;
+    if (TOUCH) {
+      // keep the radio box up top, between the side HUD columns
+      w = Math.min(520, W - 2 * (2 * rr + 44)); x = (W - w) / 2; y = 62;
+      if (w < 280) { w = W - 40; x = 20; y = 100 + 2 * rr + 34; }
+    }
     hx.fillStyle = 'rgba(0,0,0,.65)'; hx.fillRect(x, y, w, h);
     hx.strokeStyle = comm.cur.col; hx.lineWidth = 2; hx.strokeRect(x, y, w, h);
     hx.fillStyle = comm.cur.col; hx.globalAlpha = 0.25; hx.fillRect(x + 9, y + 9, 60, 60); hx.globalAlpha = 1;
@@ -1197,7 +1259,11 @@ function startGame() {
   state = 'play';
   for (const id of ['title', 'over', 'pause']) document.getElementById(id).classList.add('hidden');
   say('CONTROL', "The carrier is holding over the base. Clear its fighters out of the sky!");
-  say('CONTROL', 'Hold FIRE to charge a lock-on shot. Tap C to raise your deflector and bounce their shots back.');
+  say('CONTROL', TOUCH ? 'Hold FIRE to charge a lock-on shot. Tap SHIELD to bounce their shots back.'
+                       : 'Hold FIRE to charge a lock-on shot. Tap C to raise your deflector and bounce their shots back.');
+  if (TOUCH && document.documentElement.requestFullscreen && !document.fullscreenElement) {
+    document.documentElement.requestFullscreen().catch(() => {});
+  }
 }
 function gameOver() {
   state = 'over';
@@ -1215,6 +1281,86 @@ function setPause(on) {
 }
 
 /* =====================================================================
+   TOUCH CONTROLS (phones / tablets)
+   ===================================================================== */
+const TI = { x: 0, y: 0, fire: false, boost: false, brake: false, bomb: false, shield: false, loop: false, uturn: false };
+let TOUCH = false, shownState = '';
+function enableTouch() {
+  if (TOUCH) return;
+  TOUCH = true;
+  document.body.classList.add('touch');
+  document.getElementById('startBtn').textContent = 'TAP TO START';
+}
+if (window.matchMedia && matchMedia('(pointer: coarse)').matches) enableTouch();
+addEventListener('touchstart', enableTouch, { passive: true });
+
+function clearTouch() {
+  for (const k in TI) TI[k] = typeof TI[k] === 'number' ? 0 : false;
+  document.querySelectorAll('#touch .on').forEach(b => b.classList.remove('on'));
+  document.body.classList.remove('stick-on');
+  const base = document.getElementById('stickBase');
+  base.style.display = 'none';
+}
+function syncTouchUI() {
+  if (state === shownState) return;
+  shownState = state;
+  document.body.classList.toggle('playing', state === 'play');
+  if (state !== 'play') clearTouch();
+}
+
+// floating stick: appears wherever the left thumb lands
+(function setupStick() {
+  const zone = document.getElementById('stickZone'), base = document.getElementById('stickBase'), knob = document.getElementById('stickKnob');
+  const RAD = 58;
+  let id = null, ox = 0, oy = 0;
+  function move(e) {
+    let dx = e.clientX - ox, dy = e.clientY - oy;
+    const d = Math.hypot(dx, dy);
+    if (d > RAD) { dx *= RAD / d; dy *= RAD / d; }
+    knob.style.transform = `translate(${dx}px,${dy}px)`;
+    const nx = dx / RAD, ny = -dy / RAD;
+    TI.x = Math.abs(nx) < 0.12 ? 0 : nx;
+    TI.y = Math.abs(ny) < 0.12 ? 0 : ny;
+  }
+  function end(e) {
+    if (e.pointerId !== id) return;
+    id = null; TI.x = TI.y = 0;
+    base.style.display = 'none'; knob.style.transform = '';
+    document.body.classList.remove('stick-on');
+  }
+  zone.addEventListener('pointerdown', e => {
+    if (id !== null) return;
+    e.preventDefault();
+    id = e.pointerId;
+    try { zone.setPointerCapture(id); } catch (err) {}
+    ox = e.clientX; oy = e.clientY;
+    base.style.left = ox + 'px'; base.style.top = oy + 'px'; base.style.display = 'block';
+    document.body.classList.add('stick-on');
+    move(e);
+  });
+  zone.addEventListener('pointermove', e => { if (e.pointerId === id) move(e); });
+  zone.addEventListener('pointerup', end);
+  zone.addEventListener('pointercancel', end);
+})();
+
+// hold-buttons: each tracks its own finger, so several can be held at once
+document.querySelectorAll('#touch .tb').forEach(btn => {
+  const key = btn.dataset.k;
+  btn.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    if (key === 'pause') { setPause(true); return; }
+    try { btn.setPointerCapture(e.pointerId); } catch (err) {}
+    TI[key] = true; btn.classList.add('on');
+  });
+  const off = () => { if (key !== 'pause') { TI[key] = false; btn.classList.remove('on'); } };
+  btn.addEventListener('pointerup', off);
+  btn.addEventListener('pointercancel', off);
+  btn.addEventListener('lostpointercapture', off);
+});
+document.getElementById('touch').addEventListener('contextmenu', e => e.preventDefault());
+document.getElementById('pause').addEventListener('click', () => setPause(false));
+
+/* =====================================================================
    MAIN LOOP
    ===================================================================== */
 let last = performance.now();
@@ -1225,6 +1371,7 @@ function frame(now) {
   if ((state === 'title' || state === 'over') && edge.start) startGame();
   else if (edge.pause) setPause(state === 'play');
   if (state === 'play' && edge.cam) camMode = 1 - camMode;
+  syncTouchUI();
 
   carrier.rotation.y += dt * 0.05;
   if (state === 'play') {
