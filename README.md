@@ -1,6 +1,6 @@
 # All-Range
 
-A free-flight 3D arcade dogfighter that runs in your browser. Fly anywhere inside a large circular combat zone, clear the enemy carrier's fighters out of the sky, and see how many hits you can rack up before your ships run out.
+A free-flight 3D arcade dogfighter that runs in your browser. Fly anywhere inside a large circular combat zone, clear the enemy carrier's fighters out of the sky, and see how many hits you can rack up before you're shot down. One life, so fly carefully: crashing into terrain tears most of your shield away.
 
 **Play:** https://dhfm91.github.io/all-range/
 

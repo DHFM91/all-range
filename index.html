@@ -44,8 +44,11 @@
   .lbBox{background:rgba(0,0,0,.45);border:2px solid #3b6fd8;border-radius:6px;padding:10px 18px;min-width:230px}
   .lbTitle{color:#ffd84a;font-style:italic;font-weight:800;letter-spacing:.12em;font-size:14px;margin-bottom:6px;text-align:center}
   #lbList{list-style:none;margin:0;padding:0;font-variant-numeric:tabular-nums;font-size:15px}
-  #lbList li{display:grid;grid-template-columns:2.2em 3.4em 1fr;gap:6px;padding:2px 4px;border-radius:3px;text-align:left}
-  #lbList li .sc{text-align:right;font-weight:700}
+  #lbList li,.lbHead{display:grid;grid-template-columns:2em 1fr 1fr 1fr;gap:10px;padding:2px 6px;border-radius:3px;text-align:center}
+  #lbList li span:first-child{text-align:right}
+  #lbList li .sc{font-weight:700}
+  .lbHead{font-size:10px;font-weight:800;letter-spacing:.14em;color:#9fd3ff;padding-bottom:4px}
+  .lbBox{min-width:270px}
   #lbList li.me{background:rgba(255,216,74,.25);color:#ffd84a}
   #lbList li.empty{opacity:.4}
   #lbEntry{margin-top:10px;display:flex;flex-direction:column;align-items:center;gap:6px}
@@ -171,6 +174,7 @@
     </div>
     <div class="lbBox">
       <div class="lbTitle">GLOBAL TOP 10</div>
+      <div class="lbHead"><span></span><span>NAME</span><span>HITS</span><span>TIME</span></div>
       <ol id="lbList"></ol>
       <div class="note" id="lbStatus"></div>
     </div>
@@ -497,7 +501,7 @@ let spawnT = 0, rivalNext = 60, tailWarnCd = 0, lowWarned = false, edgeHinted = 
 const P = {
   pos: V(), vel: V(), fwd: V(0, 0, -1), q: new THREE.Quaternion(),
   yaw: 0, pitch: 0, roll: 0, bank: 0, speed: BASE_SPEED,
-  shield: 100, maxShield: 100, gold: 0, bombs: 3, laser: 0, lives: 3,
+  shield: 100, maxShield: 100, gold: 0, bombs: 3, laser: 0, lives: 1,
   g: 0, locked: false, man: null, shieldT: 0,
   charge: 0, fireHeld: 0, lock: null, activeBomb: null,
   dead: false, deadT: 0, invuln: 0, hurtCd: 0, tailT: 0
@@ -752,8 +756,9 @@ function splash(pos, radius, dmg, isBomb) {
   if (isBomb) for (const s of shots) if (s.owner === 'e' && s.pos.distanceTo(pos) < radius) s.life = 0;
 }
 
-function hurt(d) {
+function hurt(d, crash) {
   if (P.dead || P.invuln > 0) return;
+  if (crash) { shake = 1; boom(0.7, 0.6, 900); if (P.shield - d > 0) say('CONTROL', 'Hull breach! One more crash and you\'re done!', '#ff6040'); }
   P.shield -= d; shake = Math.max(shake, 0.35);
   beep(220, 60, 0.25, 'sawtooth', 0.25); boom(0.3, 0.25, 600);
   if (P.shield <= 0) { P.shield = 0; killPlayer(); return; }
@@ -877,13 +882,13 @@ function updatePlayer(dt, inp) {
   if (P.pos.y < gh + 5) {
     P.pos.y = gh + 5;
     if (!P.man) P.pitch = Math.max(P.pitch, 0.4);
-    if (P.hurtCd <= 0) { hurt(8); P.hurtCd = 0.6; explode(P.pos, 10, 0xffe080, 3); }
+    if (P.hurtCd <= 0) { hurt(P.maxShield * 0.7, true); P.hurtCd = 0.6; explode(P.pos, 10, 0xffe080, 3); }
   }
   // --- buildings
   for (const b of buildings) {
     if (Math.abs(P.pos.x - b.x) < b.hw + 5 && Math.abs(P.pos.z - b.z) < b.hd + 5 && P.pos.y < b.h + 5) {
       P.pos.y = b.h + 6; if (!P.man) P.pitch = Math.max(P.pitch, 0.5);
-      if (P.hurtCd <= 0) { hurt(10); P.hurtCd = 0.6; explode(P.pos, 12, 0xffe080, 3); }
+      if (P.hurtCd <= 0) { hurt(P.maxShield * 0.7, true); P.hurtCd = 0.6; explode(P.pos, 12, 0xffe080, 3); }
     }
   }
   // --- carrier hull
@@ -892,7 +897,7 @@ function updatePlayer(dt, inp) {
     const top = MS_Y + 62 - P.pos.y, bot = P.pos.y - (MS_Y - 104), side = MS_R + 8 - ch;
     if (side < top && side < bot) { const s = (MS_R + 10) / Math.max(ch, 1); P.pos.x *= s; P.pos.z *= s; }
     else if (top < bot) P.pos.y = MS_Y + 64; else P.pos.y = MS_Y - 106;
-    if (P.hurtCd <= 0) { hurt(10); P.hurtCd = 0.6; explode(P.pos, 12, 0xffe080, 3); }
+    if (P.hurtCd <= 0) { hurt(P.maxShield * 0.7, true); P.hurtCd = 0.6; explode(P.pos, 12, 0xffe080, 3); }
   }
 
   // --- visuals
@@ -1302,7 +1307,6 @@ function drawHUD() {
   // lives & laser (bottom-left)
   // on touch screens the bottom corners belong to the thumbs, so these move up top
   const ly = TOUCH ? 96 : H - 48;
-  txt('SHIPS × ' + Math.max(0, P.lives), 20, ly, '#9fd3ff', 16);
   txt(['SINGLE', 'TWIN', 'HYPER'][P.laser] + ' LASER', 20, ly + 22, P.laser === 2 ? '#66b0ff' : '#6cff6c', 14);
 
   // edge warning
@@ -1372,7 +1376,7 @@ function startGame() {
   actx(); engineStart();
   clearWorld();
   hits = 0; rivalNext = 60; spawnT = 0; runT = 0; threat = 1; D = 0; tailWarnCd = 6; lowWarned = false; edgeHinted = false;
-  Object.assign(P, { lives: 3, bombs: 3, laser: 0, charge: 0, fireHeld: 0, lock: null, man: null, shieldT: 0, tailT: 0 });
+  Object.assign(P, { lives: 1, bombs: 3, laser: 0, charge: 0, fireHeld: 0, lock: null, man: null, shieldT: 0, tailT: 0 });
   respawn(); P.invuln = 1.5;
   for (let i = 0; i < 6; i++) { const e = spawnEnemy(false); e.pos.set(rand(-R, R) * 0.6, rand(300, 800), rand(-R, R) * 0.6); }
   // three gold rings placed around the arena
@@ -1440,13 +1444,14 @@ function lbRender() {
   for (let i = 0; i < LB_SIZE; i++) {
     const e = lb.board[i], li = document.createElement('li');
     const fmt = t => Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0');
-    li.innerHTML = '<span></span><span></span><span class="sc"></span>';
+    li.innerHTML = '<span></span><span></span><span class="sc"></span><span></span>';
     li.children[0].textContent = (i + 1) + '.';
     if (e) {
       li.children[1].textContent = e.n;
-      li.children[2].textContent = e.s + (e.t ? '  ' + fmt(e.t) : '');
+      li.children[2].textContent = e.s;
+      li.children[3].textContent = e.t ? fmt(e.t) : '—';
       if (lb.mine && e.d === lb.mine.d && e.n === lb.mine.n && e.s === lb.mine.s) li.className = 'me';
-    } else { li.children[1].textContent = '---'; li.className = 'empty'; }
+    } else { li.children[1].textContent = '---'; li.children[2].textContent = '—'; li.children[3].textContent = '—'; li.className = 'empty'; }
     ol.appendChild(li);
   }
 }
