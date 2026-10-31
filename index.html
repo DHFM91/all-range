@@ -37,10 +37,10 @@
     background:rgba(255,216,74,.6);border:2px solid #fff;box-shadow:0 0 12px rgba(0,0,0,.4)}
   body.stick-on #stickGhost{display:none}
   .tb{position:absolute;border-radius:50%;border:2px solid rgba(255,255,255,.6);background:rgba(0,10,30,.32);color:#fff;
-    font:italic 800 12px 'Segoe UI',Tahoma,sans-serif;letter-spacing:.04em;display:flex;align-items:center;justify-content:center;
+    font:italic 800 12px 'Segoe UI',Tahoma,sans-serif;letter-spacing:.04em;display:flex;flex-direction:column;align-items:center;justify-content:center;
     text-align:center;line-height:1.1;text-shadow:1px 1px 0 #000;touch-action:none}
   .tb.on{background:rgba(255,216,74,.7);color:#111;text-shadow:none;transform:scale(.94)}
-  .tb small{display:block;font-size:9px;font-weight:600;opacity:.85}
+  .tb small{display:block;font-size:9px;font-weight:600;opacity:.85;margin-top:2px}
   #tFire{width:96px;height:96px;right:calc(22px + env(safe-area-inset-right,0px));bottom:calc(30px + env(safe-area-inset-bottom,0px));
     border-color:#6cff6c;font-size:16px}
   #tShield{width:62px;height:62px;right:calc(39px + env(safe-area-inset-right,0px));bottom:calc(144px + env(safe-area-inset-bottom,0px));border-color:#7fe8ff}
@@ -1186,7 +1186,7 @@ function drawHUD() {
   if (P.dead && P.lives > 0) txt('SHIP DOWN', W / 2, H * 0.4, '#ff6040', 34, 'center');
 
   // radar (bottom-right)
-  const rr = TOUCH ? 50 : small ? 58 : 82, cx = W - rr - 20, cy = TOUCH ? 88 + rr : H - rr - 20, s = rr / (R * 1.08);
+  const rr = TOUCH ? 44 : small ? 58 : 82, cx = W - rr - 20, cy = TOUCH ? 82 + rr : H - rr - 20, s = rr / (R * 1.08);
   hx.fillStyle = 'rgba(0,30,15,.6)'; hx.beginPath(); hx.arc(cx, cy, rr, 0, Math.PI * 2); hx.fill();
   hx.strokeStyle = '#3fd06a'; hx.lineWidth = 2; hx.stroke();
   hx.strokeStyle = 'rgba(63,208,106,.35)'; hx.lineWidth = 1;
