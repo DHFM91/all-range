@@ -183,10 +183,13 @@
 
 <div id="noengine" class="overlay hidden">
   <h1>NO ENGINE</h1>
-  <div class="note">The 3D engine couldn't load. This page needs an internet connection the first time it opens.</div>
+  <div class="note">The 3D engine couldn't load. Make sure three.min.js is in the same folder as index.html.</div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<!-- 3D engine: Three.js r128 (MIT license), shipped next to this file so the game runs offline.
+     If three.min.js is missing, fall back to the online copy. -->
+<script src="three.min.js"></script>
+<script>window.THREE || document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"><\/script>');</script>
 <script>
 'use strict';
 if (typeof THREE === 'undefined') {

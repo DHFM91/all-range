@@ -44,4 +44,6 @@ Touch controls appear automatically. Drag anywhere on the left side to steer (pu
 
 ## Running it locally
 
-Download `index.html` and open it in a browser. It needs an internet connection the first time, because the 3D engine ([Three.js](https://threejs.org)) loads from a CDN.
+Download `index.html` and `three.min.js` into the same folder and open `index.html` in a browser. Everything runs offline except the global scoreboard.
+
+The 3D engine is [Three.js](https://threejs.org) r128, included as `three.min.js` under its MIT license.
