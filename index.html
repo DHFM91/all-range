@@ -414,8 +414,9 @@ scene.add(ship);
    ===================================================================== */
 const laserGeo = new THREE.BoxGeometry(1.3, 1.3, 30);
 const laserGlowGeo = new THREE.BoxGeometry(3.6, 3.6, 34);
-const matLaserGlowG = glow(0x66ff66, 0.28), matLaserGlowB = glow(0x66b0ff, 0.28);
-const matLaserG = glow(0x66ff66), matLaserB = glow(0x66b0ff);
+const matLaserGlowG = glow(0x40ff40, 0.45), matLaserGlowB = glow(0x4090ff, 0.45);
+// solid (non-additive) cores so bolts still read against the bright sky
+const matLaserG = new THREE.MeshBasicMaterial({ color: 0x2cff3c }), matLaserB = new THREE.MeshBasicMaterial({ color: 0x3aa0ff });
 const shotGeo = new THREE.SphereGeometry(2.8, 8, 6);
 const matEShot = glow(0xff7a2a), matEShotRival = glow(0xffd040), matDeflect = glow(0x9fffff);
 const chargeGeo = new THREE.SphereGeometry(5.5, 10, 8), matCharge = glow(0x8cff8c, 0.95);
@@ -689,7 +690,7 @@ function fireLaser() {
     m.add(new THREE.Mesh(laserGlowGeo, hyper ? matLaserGlowB : matLaserGlowG));
     const pos = o.applyQuaternion(P.q).add(P.pos);
     m.position.copy(pos); m.quaternion.copy(P.q); scene.add(m);
-    shots.push({ kind: 'laser', owner: 'p', mesh: m, pos, vel: P.fwd.clone().multiplyScalar(1350 + P.speed), life: 1.1, r: 2.5, dmg: hyper ? 2 : (P.laser === 1 ? 1.5 : 1) });
+    shots.push({ kind: 'laser', owner: 'p', mesh: m, pos, vel: P.fwd.clone().multiplyScalar(1000 + P.speed), life: 1.5, r: 2.5, dmg: hyper ? 2 : (P.laser === 1 ? 1.5 : 1) });
   }
   beep(hyper ? 1700 : 1400, 300, 0.09, 'square', 0.1);
 }
