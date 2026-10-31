@@ -4,8 +4,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>All-Range</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="All-Range">
+<meta name="theme-color" content="#000000">
+<meta name="format-detection" content="telephone=no">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <style>
-  html,body{margin:0;height:100%;overflow:hidden;background:#000;font-family:'Segoe UI',Tahoma,Arial,sans-serif;user-select:none}
+  html,body{margin:0;height:100%;overflow:hidden;background:#000;font-family:'Segoe UI',Tahoma,Arial,sans-serif;
+    -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%;text-size-adjust:100%;overscroll-behavior:none}
+  body{position:fixed;inset:0}
+  #safeProbe{position:fixed;left:0;top:0;visibility:hidden;pointer-events:none;
+    padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)}
   canvas{display:block}
   #hud{position:fixed;inset:0;pointer-events:none;z-index:2}
   .overlay{position:fixed;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;
@@ -26,6 +37,7 @@
   /* ---------- touch controls ---------- */
   #touch{position:fixed;inset:0;z-index:3;display:none;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
   body.touch{touch-action:none;-webkit-touch-callout:none}
+  body.touch *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
   body.touch .overlay{touch-action:manipulation}
   body.touch.playing #touch{display:block}
   #stickZone{position:absolute;left:0;bottom:0;width:48%;height:72%}
@@ -40,9 +52,10 @@
     font:italic 800 12px 'Segoe UI',Tahoma,sans-serif;letter-spacing:.04em;display:flex;flex-direction:column;align-items:center;justify-content:center;
     text-align:center;line-height:1.1;text-shadow:1px 1px 0 #000;touch-action:none}
   .tb.on{background:rgba(255,216,74,.7);color:#111;text-shadow:none;transform:scale(.94)}
-  .tb small{display:block;font-size:9px;font-weight:600;opacity:.85;margin-top:2px}
+  .tb span,.tb small{display:block;width:100%;text-align:center}
+  .tb small{font-size:8.5px;font-weight:700;font-style:normal;letter-spacing:.08em;opacity:.9;margin-top:3px}
   #tFire{width:96px;height:96px;right:calc(22px + env(safe-area-inset-right,0px));bottom:calc(30px + env(safe-area-inset-bottom,0px));
-    border-color:#6cff6c;font-size:16px}
+    border-color:#6cff6c;font-size:19px;line-height:1}
   #tShield{width:62px;height:62px;right:calc(39px + env(safe-area-inset-right,0px));bottom:calc(144px + env(safe-area-inset-bottom,0px));border-color:#7fe8ff}
   #tBoost{width:62px;height:62px;right:calc(128px + env(safe-area-inset-right,0px));bottom:calc(108px + env(safe-area-inset-bottom,0px));border-color:#3f8cff}
   #tBomb{width:58px;height:58px;right:calc(134px + env(safe-area-inset-right,0px));bottom:calc(26px + env(safe-area-inset-bottom,0px));border-color:#ff8080}
@@ -61,12 +74,13 @@
 </head>
 <body>
 <canvas id="hud"></canvas>
+<div id="safeProbe"></div>
 
 <div id="touch">
   <div id="stickZone"></div>
   <div id="stickGhost">STEER</div>
   <div id="stickBase"><div id="stickKnob"></div></div>
-  <div class="tb" id="tFire" data-k="fire">FIRE<small>hold to lock</small></div>
+  <div class="tb" id="tFire" data-k="fire"><span>FIRE</span><small>HOLD TO LOCK</small></div>
   <div class="tb" id="tShield" data-k="shield">SHIELD</div>
   <div class="tb" id="tBoost" data-k="boost">BOOST</div>
   <div class="tb" id="tBomb" data-k="bomb">BOMB</div>
@@ -98,6 +112,7 @@
     <b>Right thumb:</b> hold <b>FIRE</b> to charge a lock-on shot. <b>SHIELD</b> bounces enemy fire back. <b>LOOP</b> gets you behind a pursuer.
   </div>
   <div id="rotateHint">Turn your phone sideways for the best view.</div>
+  <div id="iosHint" class="note hidden">For true fullscreen on iPhone: tap Share, then <b>Add to Home Screen</b>.</div>
   <button class="btn" id="startBtn">PRESS ENTER</button>
   <div class="note">Best: <span id="best">0</span> hits</div>
 </div>
@@ -1089,14 +1104,23 @@ function updateCamera(dt) {
    ===================================================================== */
 const hud = document.getElementById('hud'), hx = hud.getContext('2d');
 let W = innerWidth, H = innerHeight;
+const SAFE = { t: 0, r: 0, b: 0, l: 0 };
+function readSafe() {
+  const cs = getComputedStyle(document.getElementById('safeProbe'));
+  SAFE.t = parseFloat(cs.paddingTop) || 0; SAFE.r = parseFloat(cs.paddingRight) || 0;
+  SAFE.b = parseFloat(cs.paddingBottom) || 0; SAFE.l = parseFloat(cs.paddingLeft) || 0;
+}
 function resize() {
   W = innerWidth; H = innerHeight;
+  readSafe();
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   hud.width = W * dpr; hud.height = H * dpr; hud.style.width = W + 'px'; hud.style.height = H + 'px';
   hx.setTransform(dpr, 0, 0, dpr, 0, 0);
   renderer.setSize(W, H); camera.aspect = W / H; camera.updateProjectionMatrix();
 }
 addEventListener('resize', resize);
+addEventListener('orientationchange', () => setTimeout(resize, 300));
+if (window.visualViewport) visualViewport.addEventListener('resize', resize);
 
 function txt(s, x, y, col = '#fff', size = 16, align = 'left') {
   hx.font = `italic 800 ${size}px 'Segoe UI',Tahoma,Arial,sans-serif`;
@@ -1154,6 +1178,11 @@ function drawHUD() {
     }
   }
 
+  // panels below stay clear of the notch and home bar
+  const OW = W, OH = H;
+  hx.save(); hx.translate(SAFE.l, SAFE.t);
+  {
+  const W = OW - SAFE.l - SAFE.r, H = OH - SAFE.t - SAFE.b;
   // shield (top-left)
   const sw = small ? 140 : 210;
   txt('SHIELD', 20, 22, '#ffffff', 14);
@@ -1228,6 +1257,8 @@ function drawHUD() {
     hx.textAlign = 'left'; hx.fillStyle = '#fff';
     lines.slice(0, 2).forEach((l, i) => hx.fillText(l, x + 82, y + 42 + i * 20));
   }
+  }
+  hx.restore();
 }
 
 /* =====================================================================
@@ -1261,8 +1292,12 @@ function startGame() {
   say('CONTROL', "The carrier is holding over the base. Clear its fighters out of the sky!");
   say('CONTROL', TOUCH ? 'Hold FIRE to charge a lock-on shot. Tap SHIELD to bounce their shots back.'
                        : 'Hold FIRE to charge a lock-on shot. Tap C to raise your deflector and bounce their shots back.');
-  if (TOUCH && document.documentElement.requestFullscreen && !document.fullscreenElement) {
-    document.documentElement.requestFullscreen().catch(() => {});
+  if (TOUCH && !document.fullscreenElement && !document.webkitFullscreenElement) {
+    const de = document.documentElement;
+    try {
+      const r = de.requestFullscreen ? de.requestFullscreen({ navigationUI: 'hide' }) : de.webkitRequestFullscreen && de.webkitRequestFullscreen();
+      if (r && r.catch) r.catch(() => {});
+    } catch (e) {}
   }
 }
 function gameOver() {
@@ -1277,7 +1312,7 @@ function gameOver() {
 }
 function setPause(on) {
   if (on && state === 'play') { state = 'pause'; document.getElementById('pause').classList.remove('hidden'); if (SFX.engGain) SFX.engGain.gain.value = 0; }
-  else if (!on && state === 'pause') { state = 'play'; document.getElementById('pause').classList.add('hidden'); }
+  else if (!on && state === 'pause') { actx(); state = 'play'; document.getElementById('pause').classList.add('hidden'); }
 }
 
 /* =====================================================================
@@ -1294,12 +1329,10 @@ function enableTouch() {
 if (window.matchMedia && matchMedia('(pointer: coarse)').matches) enableTouch();
 addEventListener('touchstart', enableTouch, { passive: true });
 
+const touchResets = [];
 function clearTouch() {
   for (const k in TI) TI[k] = typeof TI[k] === 'number' ? 0 : false;
-  document.querySelectorAll('#touch .on').forEach(b => b.classList.remove('on'));
-  document.body.classList.remove('stick-on');
-  const base = document.getElementById('stickBase');
-  base.style.display = 'none';
+  touchResets.forEach(f => f());
 }
 function syncTouchUI() {
   if (state === shownState) return;
@@ -1308,13 +1341,38 @@ function syncTouchUI() {
   if (state !== 'play') clearTouch();
 }
 
-// floating stick: appears wherever the left thumb lands
+// --- iOS Safari hardening: no pinch zoom, no double-tap zoom, no rubber-band scrolling
+['gesturestart', 'gesturechange', 'gestureend'].forEach(t => document.addEventListener(t, e => e.preventDefault(), { passive: false }));
+document.addEventListener('touchmove', e => { if (e.touches.length > 1 || state === 'play') e.preventDefault(); }, { passive: false });
+document.addEventListener('dblclick', e => e.preventDefault(), { passive: false });
+let lastTouchEnd = 0;
+document.addEventListener('touchend', e => {
+  const now = Date.now();
+  if (now - lastTouchEnd < 350 && !(e.target.closest && e.target.closest('button'))) e.preventDefault();
+  lastTouchEnd = now;
+}, { passive: false });
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { setPause(true); clearTouch(); if (SFX.ctx && SFX.ctx.state === 'running') SFX.ctx.suspend(); }
+});
+
+const isIOS = /iP(hone|od|ad)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+if (isIOS && !navigator.standalone && !(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen)) {
+  document.getElementById('iosHint').classList.remove('hidden');
+}
+
+// --- floating stick: appears wherever the left thumb lands
 (function setupStick() {
   const zone = document.getElementById('stickZone'), base = document.getElementById('stickBase'), knob = document.getElementById('stickKnob');
   const RAD = 58;
   let id = null, ox = 0, oy = 0;
-  function move(e) {
-    let dx = e.clientX - ox, dy = e.clientY - oy;
+  function begin(x, y) {
+    ox = x; oy = y;
+    base.style.left = x + 'px'; base.style.top = y + 'px'; base.style.display = 'block';
+    document.body.classList.add('stick-on');
+    move(x, y);
+  }
+  function move(x, y) {
+    let dx = x - ox, dy = y - oy;
     const d = Math.hypot(dx, dy);
     if (d > RAD) { dx *= RAD / d; dy *= RAD / d; }
     knob.style.transform = `translate(${dx}px,${dy}px)`;
@@ -1322,40 +1380,53 @@ function syncTouchUI() {
     TI.x = Math.abs(nx) < 0.12 ? 0 : nx;
     TI.y = Math.abs(ny) < 0.12 ? 0 : ny;
   }
-  function end(e) {
-    if (e.pointerId !== id) return;
+  function release() {
     id = null; TI.x = TI.y = 0;
     base.style.display = 'none'; knob.style.transform = '';
     document.body.classList.remove('stick-on');
   }
-  zone.addEventListener('pointerdown', e => {
-    if (id !== null) return;
+  touchResets.push(release);
+  zone.addEventListener('touchstart', e => {
     e.preventDefault();
-    id = e.pointerId;
-    try { zone.setPointerCapture(id); } catch (err) {}
-    ox = e.clientX; oy = e.clientY;
-    base.style.left = ox + 'px'; base.style.top = oy + 'px'; base.style.display = 'block';
-    document.body.classList.add('stick-on');
-    move(e);
-  });
-  zone.addEventListener('pointermove', e => { if (e.pointerId === id) move(e); });
-  zone.addEventListener('pointerup', end);
-  zone.addEventListener('pointercancel', end);
+    if (id !== null) return;
+    const t = e.changedTouches[0];
+    id = t.identifier; begin(t.clientX, t.clientY);
+  }, { passive: false });
+  zone.addEventListener('touchmove', e => {
+    e.preventDefault();
+    for (const t of e.changedTouches) if (t.identifier === id) move(t.clientX, t.clientY);
+  }, { passive: false });
+  const endT = e => { e.preventDefault(); for (const t of e.changedTouches) if (t.identifier === id) release(); };
+  zone.addEventListener('touchend', endT, { passive: false });
+  zone.addEventListener('touchcancel', endT, { passive: false });
+  // mouse fallback, for testing touch mode on a desktop
+  zone.addEventListener('pointerdown', e => { if (e.pointerType === 'mouse' && id === null) { id = 'mouse'; begin(e.clientX, e.clientY); } });
+  addEventListener('pointermove', e => { if (id === 'mouse') move(e.clientX, e.clientY); });
+  addEventListener('pointerup', () => { if (id === 'mouse') release(); });
 })();
 
-// hold-buttons: each tracks its own finger, so several can be held at once
+// --- hold-buttons: each tracks its own fingers, so several can be held at once
 document.querySelectorAll('#touch .tb').forEach(btn => {
-  const key = btn.dataset.k;
-  btn.addEventListener('pointerdown', e => {
+  const key = btn.dataset.k, fingers = new Set();
+  const press = () => { if (key === 'pause') { setPause(true); return; } TI[key] = true; btn.classList.add('on'); };
+  const lift = () => { fingers.clear(); if (key !== 'pause') { TI[key] = false; btn.classList.remove('on'); } };
+  touchResets.push(lift);
+  btn.addEventListener('touchstart', e => {
     e.preventDefault();
-    if (key === 'pause') { setPause(true); return; }
-    try { btn.setPointerCapture(e.pointerId); } catch (err) {}
-    TI[key] = true; btn.classList.add('on');
-  });
-  const off = () => { if (key !== 'pause') { TI[key] = false; btn.classList.remove('on'); } };
-  btn.addEventListener('pointerup', off);
-  btn.addEventListener('pointercancel', off);
-  btn.addEventListener('lostpointercapture', off);
+    for (const t of e.changedTouches) fingers.add(t.identifier);
+    press();
+  }, { passive: false });
+  const end = e => {
+    e.preventDefault();
+    for (const t of e.changedTouches) fingers.delete(t.identifier);
+    if (!fingers.size) lift();
+  };
+  btn.addEventListener('touchend', end, { passive: false });
+  btn.addEventListener('touchcancel', end, { passive: false });
+  btn.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+  btn.addEventListener('pointerdown', e => { if (e.pointerType === 'mouse') { e.preventDefault(); press(); } });
+  btn.addEventListener('pointerup', e => { if (e.pointerType === 'mouse') lift(); });
+  btn.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') lift(); });
 });
 document.getElementById('touch').addEventListener('contextmenu', e => e.preventDefault());
 document.getElementById('pause').addEventListener('click', () => setPause(false));
