@@ -1370,7 +1370,7 @@ function gameOver() {
 /* =====================================================================
    GLOBAL SCOREBOARD (shared JSON bin, top 10 by hits, time survived breaks ties)
    ===================================================================== */
-const LB_URL = 'https://json.extendsclass.com/bin/__BIN_ID__';
+const LB_URL = 'https://json.extendsclass.com/bin/4e36ecfecd7a';
 const LB_SIZE = 10;
 const lb = { board: [], score: 0, secs: 0, mine: null, entering: false };
 const $ = id => document.getElementById(id);
@@ -1407,8 +1407,6 @@ function lbRender() {
   }
 }
 async function lbShowGameOver(score, secs) {
-  document.querySelector('.lbBox').classList.toggle('hidden', !LB_URL.indexOf || LB_URL.includes('__BIN'));
-  if (LB_URL.includes('__BIN')) return; // scoreboard not connected yet
   lb.score = score; lb.secs = Math.floor(secs); lb.mine = null; lb.entering = false;
   $('lbEntry').classList.add('hidden');
   $('lbStatus').textContent = 'Loading global scores…';
