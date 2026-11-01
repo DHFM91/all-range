@@ -32,6 +32,20 @@
   .mapLine span{color:#cfe3ff;letter-spacing:0;font-size:13px}
   .mapLine small{color:#9fd3ff;font-size:11px;letter-spacing:.06em;opacity:.85}
   @media (max-height:520px){ .mapLine small,.mapLine span{display:none} .mapLine{margin:-.4em 0 .5em} }
+  #title{background:linear-gradient(to bottom,rgba(0,0,14,.62) 0%,rgba(0,0,14,.15) 34%,rgba(0,0,14,.1) 62%,rgba(0,0,14,.7) 100%);
+    overflow-y:auto;justify-content:safe center;padding-block:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-bottom,0px))}
+  .startBig{font-size:30px;padding:14px 38px;margin:18px 0 22px;animation:startPulse 1.6s ease-in-out infinite}
+  @keyframes startPulse{0%,100%{transform:scale(1);box-shadow:4px 4px 0 #c0392b}50%{transform:scale(1.05);box-shadow:6px 6px 0 #c0392b,0 0 24px rgba(255,216,74,.55)}}
+  @media (prefers-reduced-motion:reduce){.startBig{animation:none}}
+  .howBtn{background:rgba(0,0,0,.4);color:#9fd3ff;border:2px solid #3b6fd8;border-radius:4px;font:800 12px 'Segoe UI',Tahoma,sans-serif;
+    letter-spacing:.18em;padding:7px 16px;cursor:pointer;margin-bottom:10px}
+  .howBtn:hover{color:#fff;border-color:#9fd3ff}
+  .howBtn:focus-visible{outline:3px solid #fff;outline-offset:2px}
+  #howTo{display:flex;flex-direction:column;align-items:center;margin-bottom:6px}
+  #howTo.hidden{display:none!important}
+  .bgName{position:fixed;left:max(14px,env(safe-area-inset-left,0px));bottom:max(10px,env(safe-area-inset-bottom,0px));
+    color:rgba(255,255,255,.55);font-size:11px;letter-spacing:.14em;font-weight:700;text-transform:uppercase}
+  @media (max-height:520px){ .startBig{font-size:24px;padding:10px 28px;margin:10px 0 12px} }
   .panel b{color:#ffd84a;font-weight:700}
   .panel .ph{color:#9fd3ff;font-size:11px;font-weight:800;letter-spacing:.18em;margin-top:6px}
   .panel .ph:first-child{margin-top:0}
@@ -127,7 +141,10 @@
 <div id="title" class="overlay">
   <h1>ALL-RANGE</h1>
   <div class="sub">working title</div>
+  <button class="btn startBig" id="startBtn">START GAME</button>
   <div class="mapLine">TODAY'S MAP: <b id="mapName"></b><span id="mapBlurb"></span><small>A new map every day at midnight (Eastern)</small></div>
+  <button class="howBtn" id="howBtn" aria-expanded="false" aria-controls="howTo">CONTROLS</button>
+  <div id="howTo" class="hidden">
   <div class="panel">
     <span class="ph">MOUSE + KEYBOARD</span><span class="ph"></span>
     <span><b>Mouse</b></span><span>Aim — the nose follows the cursor</span>
@@ -145,15 +162,16 @@
     <span><b>V</b> &nbsp; <b>M</b> &nbsp; <b>P / Esc</b></span><span>Camera &nbsp;·&nbsp; Mute &nbsp;·&nbsp; Pause</span>
     <span><b>Gamepad</b></span><span>Stick steer · A fire · X bomb · RT/LT boost/brake · LB/RB bank · Left stick click shield · Y loop · B U-turn</span>
   </div>
-  <div class="note" id="mouseNote">Click <b>START</b> and the game captures your mouse for aiming. Press Esc to let it go.</div>
+  <div class="note" id="mouseNote">Click <b>START GAME</b> and the game captures your mouse for aiming. Press Esc to let it go.</div>
   <div id="touchHelp">
     <b>Left thumb:</b> touch anywhere on the left side and drag to steer. Push all the way left or right for a tight turn.<br>
     <b>Right thumb:</b> hold <b>FIRE</b> to charge a lock-on shot. <b>SHIELD</b> bounces enemy fire back. <b>LOOP</b> gets you behind a pursuer.
   </div>
   <div id="rotateHint">Turn your phone sideways for the best view.</div>
   <div id="iosHint" class="note hidden">For true fullscreen on iPhone: tap Share, then <b>Add to Home Screen</b>.</div>
-  <button class="btn" id="startBtn">START</button>
+  </div>
   <div class="note">Best: <span id="best">0</span> hits</div>
+  <div class="bgName" id="bgName"></div>
 </div>
 
 <div id="pause" class="overlay hidden">
@@ -271,8 +289,11 @@ function mapForDay(n) {
   return o[n - b * 3];
 }
 const TODAY = easternDayNumber();
-let MAP_KEY = mapForDay(TODAY);
-try { const q = new URLSearchParams(location.search).get('map'); if (MAP_KEYS.includes(q)) MAP_KEY = q; } catch (e) {}
+let DAILY_KEY = mapForDay(TODAY), PREVIEW = false;
+try { const q = new URLSearchParams(location.search).get('map'); if (MAP_KEYS.includes(q)) { DAILY_KEY = q; PREVIEW = true; } } catch (e) {}
+// the splash screen flies over a random map; START GAME always loads today's
+const SPLASH_KEY = PREVIEW ? DAILY_KEY : MAP_KEYS[Math.floor(Math.random() * MAP_KEYS.length)];
+let MAP_KEY = SPLASH_KEY;
 
 const MAPDEF = {
   valley: { name: 'GREEN VALLEY', blurb: 'Rolling hills and forest around the base.',
@@ -282,8 +303,8 @@ const MAPDEF = {
   spires: { name: 'SPIRE CANYON', blurb: 'Red rock canyons and towering stone spires. Thread the needles.',
     sky: 0xe7b98e, hemiSky: 0xffe2c4, hemiGround: 0x7a4a30, sun: 0xffd9a8, fog: [700, 4300], water: null, trees: 0, clouds: 16, cloud: 0xffe8d2 },
 };
-const MAP = MAPDEF[MAP_KEY];
-const WATER_Y = MAP.water; // null when the map has no sea
+let MAP = MAPDEF[MAP_KEY];
+let WATER_Y = MAP.water; // null when the map has no sea
 
 // rock pillars (sea stacks / spires): solid cones you can crash into. {x, z, y0, h, rb, rt}
 const pillars = [];
@@ -344,7 +365,8 @@ function pillarAt(p, pad) {
 }
 
 // fixed layouts per map (seeded, so every player flies the same course)
-(function layoutMap() {
+function layoutMap() {
+  pillars.length = 0; islands.length = 0;
   const r = seeded(MAP_KEY === 'ocean' ? 2222 : 3333);
   const clearOf = (x, z, gap) => pillars.every(c => Math.hypot(c.x - x, c.z - z) > c.rb + gap);
   if (MAP_KEY === 'ocean') {
@@ -372,7 +394,7 @@ function pillarAt(p, pad) {
       pillars.push({ x, z, y0: spiresGround(x, z, d) - 30, h: 300 + r() * 450 + far * 380, rb, rt: 10 + r() * 26 });
     }
   }
-})();
+}
 
 /* =====================================================================
    RENDERER / SCENE
@@ -383,15 +405,25 @@ renderer.setSize(innerWidth, innerHeight);
 document.body.prepend(renderer.domElement);
 
 const scene = new THREE.Scene();
-const SKY = MAP.sky;
-scene.background = new THREE.Color(SKY);
-scene.fog = new THREE.Fog(SKY, MAP.fog[0], MAP.fog[1]);
+scene.background = new THREE.Color();
+scene.fog = new THREE.Fog(0xffffff, 1000, 5000);
 
 const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 1, 8000);
-scene.add(new THREE.HemisphereLight(MAP.hemiSky, MAP.hemiGround, 0.75));
-const sunLight = new THREE.DirectionalLight(MAP.sun, 0.95);
+const hemiLight = new THREE.HemisphereLight(0xffffff, 0xffffff, 0.75);
+scene.add(hemiLight);
+const sunLight = new THREE.DirectionalLight(0xffffff, 0.95);
 sunLight.position.set(0.6, 1, 0.35);
 scene.add(sunLight);
+
+function applySky() {
+  scene.background.setHex(MAP.sky);
+  scene.fog.color.setHex(MAP.sky); scene.fog.near = MAP.fog[0]; scene.fog.far = MAP.fog[1];
+  hemiLight.color.setHex(MAP.hemiSky); hemiLight.groundColor.setHex(MAP.hemiGround);
+  sunLight.color.setHex(MAP.sun);
+}
+// everything that changes between maps lives in this group so it can be swapped out
+const worldGroup = new THREE.Group();
+scene.add(worldGroup);
 
 /* ---------- terrain ---------- */
 function terrainColor(c, x, y, z, d) {
@@ -417,7 +449,7 @@ function terrainColor(c, x, y, z, d) {
   }
 }
 let terrainMesh = null, terrainPosOrig = null, terrainColOrig = null;
-(function buildTerrain() {
+function buildTerrain() {
   const S = R * 2.9, N = 150;
   const g = new THREE.PlaneGeometry(S, S, N, N);
   g.rotateX(-Math.PI / 2);
@@ -438,17 +470,19 @@ let terrainMesh = null, terrainPosOrig = null, terrainColOrig = null;
   }
   ng.setAttribute('color', new THREE.BufferAttribute(cols, 3));
   terrainMesh = new THREE.Mesh(ng, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }));
-  scene.add(terrainMesh);
+  worldGroup.add(terrainMesh);
   terrainPosOrig = pos.array.slice(); terrainColOrig = cols.slice();
-})();
+}
 
 /* ---------- sea (ocean map): low-poly rolling waves ---------- */
 let water = null, waterBase = null;
-if (WATER_Y !== null) {
+function buildWater() {
+  water = null;
+  if (WATER_Y === null) return;
   const g = new THREE.PlaneGeometry(R * 2.9, R * 2.9, 72, 72); g.rotateX(-Math.PI / 2);
   water = new THREE.Mesh(g, new THREE.MeshPhongMaterial({ color: 0x1f7fb0, specular: 0x9fd8ff, shininess: 60, flatShading: true, transparent: true, opacity: 0.8 }));
   water.position.y = WATER_Y;
-  scene.add(water);
+  worldGroup.add(water);
   waterBase = g.attributes.position.array.slice();
 }
 function updateWater(t) {
@@ -462,7 +496,7 @@ function updateWater(t) {
 }
 
 /* ---------- rock pillars: sea stacks or canyon spires, with banded strata ---------- */
-(function buildPillars() {
+function buildPillars() {
   if (!pillars.length) return;
   const pal = MAP_KEY === 'spires' ? [0xa9583a, 0xc27a4e, 0x8e4a33, 0xd09468] : [0x6f6a62, 0x857d70, 0x5d5a55, 0x9a917f];
   const mat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
@@ -487,13 +521,14 @@ function updateWater(t) {
     const m = new THREE.Mesh(ng, mat);
     m.position.set(pl.x, pl.y0 + pl.h / 2, pl.z);
     m.rotation.y = rand(0, 6.28);
-    scene.add(m);
+    worldGroup.add(m);
   }
-})();
+}
 
 /* ---------- trees ---------- */
 let treeMesh = null, treeOrig = null, treeXZ = [];
-(function buildTrees() {
+function buildTrees() {
+  treeXZ = [];
   const geo = new THREE.ConeGeometry(14, 46, 5); geo.translate(0, 23, 0);
   const count = Math.max(1, MAP.trees);
   const trees = new THREE.InstancedMesh(geo, lambert(MAP_KEY === 'ocean' ? 0x3f8a3a : 0x2f6b2a), count);
@@ -510,9 +545,9 @@ let treeMesh = null, treeOrig = null, treeXZ = [];
     trees.setMatrixAt(n++, m4);
   }
   trees.count = n;
-  scene.add(trees);
+  worldGroup.add(trees);
   treeMesh = trees; treeOrig = trees.instanceMatrix.array.slice();
-})();
+}
 
 /* ---------- base buildings ---------- */
 const buildings = [];
@@ -536,7 +571,7 @@ function addBuilding(x, z, w, h, d, col, roof) {
 })();
 
 /* ---------- clouds ---------- */
-(function buildClouds() {
+function buildClouds() {
   const mat = new THREE.MeshLambertMaterial({ color: MAP.cloud, flatShading: true, transparent: true, opacity: 0.9 });
   for (let i = 0; i < MAP.clouds; i++) {
     const g = new THREE.Group();
@@ -547,9 +582,26 @@ function addBuilding(x, z, w, h, d, col, roof) {
     }
     const a = rand(0, 6.28), d = rand(0, R * 1.15);
     g.position.set(Math.cos(a) * d, rand(1150, 1550), Math.sin(a) * d);
-    scene.add(g);
+    worldGroup.add(g);
   }
-})();
+}
+
+// tear down the current map and build another
+let worldBuilt = false;
+function loadMap(key) {
+  if (worldBuilt) resetWorldDamage(); // un-damage the base and carrier
+  worldGroup.traverse(o => {
+    if (o.geometry) o.geometry.dispose();
+    if (o.material) [].concat(o.material).forEach(m => m.dispose());
+  });
+  worldGroup.clear();
+  craters.length = 0;
+  MAP_KEY = key; MAP = MAPDEF[key]; WATER_Y = MAP.water;
+  layoutMap(); applySky();
+  buildTerrain(); buildWater(); buildPillars(); buildTrees(); buildClouds();
+  worldBuilt = true;
+}
+loadMap(MAP_KEY);
 
 /* ---------- carrier (enemy mothership) ---------- */
 const carrier = new THREE.Group();
@@ -1530,9 +1582,10 @@ function snapCamera() {
 function updateCamera(dt) {
   if (state === 'title') {
     const a = time * 0.06;
-    camera.position.set(Math.cos(a) * 1700, 650, Math.sin(a) * 1700);
+    const cy = MAP_KEY === 'spires' ? 1480 : MAP_KEY === 'ocean' ? 520 : 650;
+    camera.position.set(Math.cos(a) * 1700, cy, Math.sin(a) * 1700);
     camera.up.set(0, 1, 0);
-    camera.lookAt(0, 780, 0);
+    camera.lookAt(0, MAP_KEY === 'spires' ? 700 : 780, 0);
     camera.fov = 60; camera.updateProjectionMatrix();
     return;
   }
@@ -1759,6 +1812,7 @@ function clearWorld() {
   comm.queue.length = 0; comm.cur = null;
 }
 function startGame() {
+  if (MAP_KEY !== DAILY_KEY) loadMap(DAILY_KEY);
   actx(); engineStart();
   clearWorld();
   resetWorldDamage();
@@ -1903,7 +1957,6 @@ function enableTouch() {
   if (TOUCH) return;
   TOUCH = true;
   document.body.classList.add('touch');
-  document.getElementById('startBtn').textContent = 'TAP TO START';
 }
 if (window.matchMedia && matchMedia('(pointer: coarse)').matches) enableTouch();
 addEventListener('touchstart', enableTouch, { passive: true });
@@ -2110,8 +2163,14 @@ function frame(now) {
 }
 resize();
 ship.visible = false;
-document.getElementById('mapName').textContent = MAP.name;
-document.getElementById('mapBlurb').textContent = MAP.blurb;
+document.getElementById('mapName').textContent = MAPDEF[DAILY_KEY].name;
+document.getElementById('mapBlurb').textContent = MAPDEF[DAILY_KEY].blurb;
+document.getElementById('bgName').textContent = 'Flying over: ' + MAPDEF[SPLASH_KEY].name;
+document.getElementById('howBtn').addEventListener('click', e => {
+  const box = document.getElementById('howTo'), open = box.classList.toggle('hidden') === false;
+  e.currentTarget.setAttribute('aria-expanded', open);
+  e.currentTarget.textContent = open ? 'HIDE CONTROLS' : 'CONTROLS';
+});
 requestAnimationFrame(frame);
 
 // small debug hook for testing
