@@ -27,6 +27,11 @@
   .sub{margin:.2em 0 1.2em;color:#9fd3ff;letter-spacing:.3em;font-size:14px;text-transform:uppercase}
   .panel{background:rgba(0,0,0,.45);border:2px solid #3b6fd8;border-radius:6px;padding:14px 22px;max-width:640px;
     display:grid;grid-template-columns:auto auto;gap:4px 22px;text-align:left;font-size:14px}
+  .mapLine{margin:-.6em 0 1em;color:#fff;font-size:14px;letter-spacing:.08em;text-align:center;display:flex;flex-direction:column;gap:2px;max-width:640px;padding:0 16px}
+  .mapLine b{color:#ffd84a;font-style:italic;letter-spacing:.12em}
+  .mapLine span{color:#cfe3ff;letter-spacing:0;font-size:13px}
+  .mapLine small{color:#9fd3ff;font-size:11px;letter-spacing:.06em;opacity:.85}
+  @media (max-height:520px){ .mapLine small,.mapLine span{display:none} .mapLine{margin:-.4em 0 .5em} }
   .panel b{color:#ffd84a;font-weight:700}
   .panel .ph{color:#9fd3ff;font-size:11px;font-weight:800;letter-spacing:.18em;margin-top:6px}
   .panel .ph:first-child{margin-top:0}
@@ -122,6 +127,7 @@
 <div id="title" class="overlay">
   <h1>ALL-RANGE</h1>
   <div class="sub">working title</div>
+  <div class="mapLine">TODAY'S MAP: <b id="mapName"></b><span id="mapBlurb"></span><small>A new map every day at midnight (Eastern)</small></div>
   <div class="panel">
     <span class="ph">MOUSE + KEYBOARD</span><span class="ph"></span>
     <span><b>Mouse</b></span><span>Aim — the nose follows the cursor</span>
@@ -237,18 +243,136 @@ function craterDepthAt(x, z) {
   }
   return Math.min(dep, MAX_DIG);
 }
-function groundH(x, z) { return groundBase(x, z) - (craters.length ? craterDepthAt(x, z) : 0); }
-function groundBase(x, z) {
-  const d = Math.hypot(x, z);
-  let h = 34 * Math.sin(x * 0.0041) * Math.cos(z * 0.0036)
-        + 20 * Math.sin(x * 0.011 + 1.3) * Math.sin(z * 0.0093 + 0.7)
-        + 9 * Math.sin(x * 0.027 + z * 0.021);
-  h = (h + 20) * smooth(380, 820, d);
-  const a = Math.atan2(z, x);
-  const m = smooth(R * 0.9, R * 1.3, d);
-  h += m * m * (650 + 220 * Math.sin(a * 7) + 120 * Math.sin(a * 17));
+/* =====================================================================
+   MAPS: one is picked per day (midnight Eastern), never the same two days running.
+   Add ?map=valley | ocean | spires to the address to preview one.
+   ===================================================================== */
+const MAP_KEYS = ['valley', 'ocean', 'spires'];
+function seeded(seed) {
+  let a = seed >>> 0;
+  return () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+}
+function easternDayNumber() {
+  try {
+    const str = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+    const [y, m, d] = str.split('-').map(Number);
+    if (y && m && d) return Math.round(Date.UTC(y, m - 1, d) / 864e5);
+  } catch (e) {}
+  return Math.floor((Date.now() - 5 * 3600e3) / 864e5);
+}
+function blockOrder(block) { // the three maps shuffled for each 3-day block
+  const r = seeded(block * 7919 + 17), o = MAP_KEYS.slice();
+  for (let i = o.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [o[i], o[j]] = [o[j], o[i]]; }
+  return o;
+}
+function mapForDay(n) {
+  const b = Math.floor(n / 3), o = blockOrder(b);
+  if (o[0] === blockOrder(b - 1)[2]) [o[0], o[1]] = [o[1], o[0]]; // no repeat across blocks
+  return o[n - b * 3];
+}
+const TODAY = easternDayNumber();
+let MAP_KEY = mapForDay(TODAY);
+try { const q = new URLSearchParams(location.search).get('map'); if (MAP_KEYS.includes(q)) MAP_KEY = q; } catch (e) {}
+
+const MAPDEF = {
+  valley: { name: 'GREEN VALLEY', blurb: 'Rolling hills and forest around the base.',
+    sky: 0x8ec3f0, hemiSky: 0xcfe6ff, hemiGround: 0x50602f, sun: 0xfff2d8, fog: [900, 4600], water: null, trees: 650, clouds: 34, cloud: 0xffffff },
+  ocean: { name: 'BROKEN SEA', blurb: 'An island base in open water, ringed by sea stacks. The waves are as hard as rock.',
+    sky: 0x7cc4ee, hemiSky: 0xd8f0ff, hemiGround: 0x2a5a6a, sun: 0xfff6e0, fog: [1000, 5000], water: -14, trees: 260, clouds: 40, cloud: 0xffffff },
+  spires: { name: 'SPIRE CANYON', blurb: 'Red rock canyons and towering stone spires. Thread the needles.',
+    sky: 0xe7b98e, hemiSky: 0xffe2c4, hemiGround: 0x7a4a30, sun: 0xffd9a8, fog: [700, 4300], water: null, trees: 0, clouds: 16, cloud: 0xffe8d2 },
+};
+const MAP = MAPDEF[MAP_KEY];
+const WATER_Y = MAP.water; // null when the map has no sea
+
+// rock pillars (sea stacks / spires): solid cones you can crash into. {x, z, y0, h, rb, rt}
+const pillars = [];
+const islands = [];
+
+function rimH(x, z, d) {
+  const a = Math.atan2(z, x), m = smooth(R * 0.9, R * 1.3, d);
+  return m * m * (650 + 220 * Math.sin(a * 7) + 120 * Math.sin(a * 17));
+}
+function valleyGround(x, z, d) {
+  const h = 34 * Math.sin(x * 0.0041) * Math.cos(z * 0.0036)
+          + 20 * Math.sin(x * 0.011 + 1.3) * Math.sin(z * 0.0093 + 0.7)
+          + 9 * Math.sin(x * 0.027 + z * 0.021);
+  return (h + 20) * smooth(380, 820, d);
+}
+function oceanGround(x, z, d) {
+  let h = -75 + 10 * Math.sin(x * 0.004 + 1) * Math.cos(z * 0.0047) + 6 * Math.sin(x * 0.013 + z * 0.011);
+  // the base island: flat top, a sandy shelf, then the drop-off
+  const core = d < 430 ? 0 : d < 560 ? -16 * smooth(430, 560, d) : -16 - 59 * smooth(560, 800, d);
+  if (core > h) h = core;
+  for (const i of islands) {
+    const dx = x - i.x, dz = z - i.z;
+    if (dx > i.r * 1.3 || dx < -i.r * 1.3 || dz > i.r * 1.3 || dz < -i.r * 1.3) continue;
+    const t = Math.hypot(dx, dz) / i.r;
+    if (t >= 1.25) continue;
+    const k = Math.max(0, 1 - t * t / 1.5625);
+    const hh = -75 + (i.h + 75) * Math.pow(k, 0.8) + 9 * Math.sin(x * 0.03 + i.x) * Math.cos(z * 0.027) * k;
+    if (hh > h) h = hh;
+  }
   return h;
 }
+function spiresGround(x, z, d) {
+  // ridged canyon walls with a flat plateau for the base
+  const r1 = 1 - Math.abs(Math.sin(x * 0.0045 + 0.8 * Math.sin(z * 0.003)));
+  const r2 = 1 - Math.abs(Math.sin(z * 0.0052 + 0.7 * Math.sin(x * 0.0037)));
+  const h = 150 * r1 * r1 * r1 + 120 * r2 * r2 * r2 + 16 * Math.sin(x * 0.02 + z * 0.017);
+  return h * smooth(450, 900, d);
+}
+function groundBase(x, z) {
+  const d = Math.hypot(x, z);
+  const h = MAP_KEY === 'ocean' ? oceanGround(x, z, d) : MAP_KEY === 'spires' ? spiresGround(x, z, d) : valleyGround(x, z, d);
+  return h + rimH(x, z, d);
+}
+// what you can crash into: dug ground, and the sea surface counts as solid
+function groundH(x, z) {
+  const h = groundBase(x, z) - (craters.length ? craterDepthAt(x, z) : 0);
+  return WATER_Y !== null && h < WATER_Y ? WATER_Y : h;
+}
+function pillarAt(p, pad) {
+  for (let i = 0; i < pillars.length; i++) {
+    const c = pillars[i], dx = p.x - c.x, dz = p.z - c.z, lim = c.rb + pad;
+    if (dx > lim || dx < -lim || dz > lim || dz < -lim) continue;
+    if (p.y < c.y0 || p.y > c.y0 + c.h + pad) continue;
+    const t = clamp((p.y - c.y0) / c.h, 0, 1), rr = (c.rb + (c.rt - c.rb) * t) * 0.92 + pad;
+    if (dx * dx + dz * dz < rr * rr) return c;
+  }
+  return null;
+}
+
+// fixed layouts per map (seeded, so every player flies the same course)
+(function layoutMap() {
+  const r = seeded(MAP_KEY === 'ocean' ? 2222 : 3333);
+  const clearOf = (x, z, gap) => pillars.every(c => Math.hypot(c.x - x, c.z - z) > c.rb + gap);
+  if (MAP_KEY === 'ocean') {
+    let guard = 0;
+    while (islands.length < 13 && guard++ < 800) {
+      const a = r() * 6.2832, d = 950 + r() * 1350, x = Math.cos(a) * d, z = Math.sin(a) * d, rad = 130 + r() * 230;
+      if (islands.some(i => Math.hypot(i.x - x, i.z - z) < i.r + rad + 140)) continue;
+      islands.push({ x, z, r: rad, h: 20 + r() * 120 });
+    }
+    guard = 0;
+    while (pillars.length < 24 && guard++ < 2000) {
+      const a = r() * 6.2832, d = 700 + r() * 1750, x = Math.cos(a) * d, z = Math.sin(a) * d;
+      const rb = 40 + r() * 50;
+      if (islands.some(i => Math.hypot(i.x - x, i.z - z) < i.r * 1.3 + rb + 40) || !clearOf(x, z, rb + 150)) continue;
+      const tall = r() < 0.2;
+      pillars.push({ x, z, y0: -85, h: (tall ? 430 : 170) + r() * (tall ? 200 : 260), rb, rt: rb * (0.28 + r() * 0.3) });
+    }
+  } else if (MAP_KEY === 'spires') {
+    let guard = 0;
+    while (pillars.length < 72 && guard++ < 4000) {
+      const a = r() * 6.2832, d = 680 + r() * 1800, x = Math.cos(a) * d, z = Math.sin(a) * d;
+      const rb = 50 + r() * 70;
+      if (!clearOf(x, z, rb + 120)) continue;
+      const far = (d - 680) / 1800;
+      pillars.push({ x, z, y0: spiresGround(x, z, d) - 30, h: 300 + r() * 450 + far * 380, rb, rt: 10 + r() * 26 });
+    }
+  }
+})();
 
 /* =====================================================================
    RENDERER / SCENE
@@ -259,24 +383,46 @@ renderer.setSize(innerWidth, innerHeight);
 document.body.prepend(renderer.domElement);
 
 const scene = new THREE.Scene();
-const SKY = 0x8ec3f0;
+const SKY = MAP.sky;
 scene.background = new THREE.Color(SKY);
-scene.fog = new THREE.Fog(SKY, 900, 4600);
+scene.fog = new THREE.Fog(SKY, MAP.fog[0], MAP.fog[1]);
 
 const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 1, 8000);
-scene.add(new THREE.HemisphereLight(0xcfe6ff, 0x50602f, 0.75));
-const sunLight = new THREE.DirectionalLight(0xfff2d8, 0.95);
+scene.add(new THREE.HemisphereLight(MAP.hemiSky, MAP.hemiGround, 0.75));
+const sunLight = new THREE.DirectionalLight(MAP.sun, 0.95);
 sunLight.position.set(0.6, 1, 0.35);
 scene.add(sunLight);
 
 /* ---------- terrain ---------- */
+function terrainColor(c, x, y, z, d) {
+  if (MAP_KEY === 'ocean') {
+    if (y > 300) c.setHex(0x7d7466);
+    else if (d < 380 && y > -3) c.setHex(0x9a9a8c);
+    else if (y > 85) c.setHex(0x8a7d6a);
+    else if (y > 4) c.setHex(0x5d9c42);
+    else if (y > -19) c.setHex(0xdcc894);
+    else if (y > -42) c.setHex(0x3f9a8f);
+    else c.setHex(0x245a6e);
+  } else if (MAP_KEY === 'spires') {
+    if (d < 380 && y < 6) c.setHex(0x9a9a8c);
+    else if (y > 520) c.setHex(0x8f4e33);
+    else if (y < 14) c.setHex(0xd6a06a);
+    else c.setHex([0xb8673d, 0xc98552, 0xa45634][Math.floor((y + 400) / 38) % 3]);
+  } else {
+    if (y > 560) c.setHex(0xeef0f6);
+    else if (y > 280) c.setHex(0x8b7d68);
+    else if (y > 115) c.setHex(0x6f7a45);
+    else if (d < 380) c.setHex(0x9a9a8c);
+    else c.setHex(0x4f8c3c);
+  }
+}
 let terrainMesh = null, terrainPosOrig = null, terrainColOrig = null;
 (function buildTerrain() {
   const S = R * 2.9, N = 150;
   const g = new THREE.PlaneGeometry(S, S, N, N);
   g.rotateX(-Math.PI / 2);
   const p = g.attributes.position;
-  for (let i = 0; i < p.count; i++) p.setY(i, groundH(p.getX(i), p.getZ(i)));
+  for (let i = 0; i < p.count; i++) p.setY(i, groundBase(p.getX(i), p.getZ(i)));
   const ng = g.toNonIndexed();
   ng.computeVertexNormals();
   const pos = ng.attributes.position;
@@ -286,12 +432,7 @@ let terrainMesh = null, terrainPosOrig = null, terrainColOrig = null;
     const y = (pos.getY(i) + pos.getY(i + 1) + pos.getY(i + 2)) / 3;
     const x = (pos.getX(i) + pos.getX(i + 1) + pos.getX(i + 2)) / 3;
     const z = (pos.getZ(i) + pos.getZ(i + 1) + pos.getZ(i + 2)) / 3;
-    const d = Math.hypot(x, z);
-    if (y > 560) c.setHex(0xeef0f6);
-    else if (y > 280) c.setHex(0x8b7d68);
-    else if (y > 115) c.setHex(0x6f7a45);
-    else if (d < 380) c.setHex(0x9a9a8c);
-    else c.setHex(0x4f8c3c);
+    terrainColor(c, x, y, z, Math.hypot(x, z));
     c.offsetHSL(0, 0, rand(-0.035, 0.035));
     for (let k = 0; k < 3; k++) { cols[(i + k) * 3] = c.r; cols[(i + k) * 3 + 1] = c.g; cols[(i + k) * 3 + 2] = c.b; }
   }
@@ -301,18 +442,68 @@ let terrainMesh = null, terrainPosOrig = null, terrainColOrig = null;
   terrainPosOrig = pos.array.slice(); terrainColOrig = cols.slice();
 })();
 
+/* ---------- sea (ocean map): low-poly rolling waves ---------- */
+let water = null, waterBase = null;
+if (WATER_Y !== null) {
+  const g = new THREE.PlaneGeometry(R * 2.9, R * 2.9, 72, 72); g.rotateX(-Math.PI / 2);
+  water = new THREE.Mesh(g, new THREE.MeshPhongMaterial({ color: 0x1f7fb0, specular: 0x9fd8ff, shininess: 60, flatShading: true, transparent: true, opacity: 0.8 }));
+  water.position.y = WATER_Y;
+  scene.add(water);
+  waterBase = g.attributes.position.array.slice();
+}
+function updateWater(t) {
+  if (!water) return;
+  const a = water.geometry.attributes.position.array;
+  for (let i = 0; i < a.length; i += 3) {
+    const x = waterBase[i], z = waterBase[i + 2];
+    a[i + 1] = 3.2 * Math.sin(x * 0.011 + t * 1.3) + 2.4 * Math.cos(z * 0.013 + t * 1.05) + 1.2 * Math.sin((x + z) * 0.02 + t * 2);
+  }
+  water.geometry.attributes.position.needsUpdate = true;
+}
+
+/* ---------- rock pillars: sea stacks or canyon spires, with banded strata ---------- */
+(function buildPillars() {
+  if (!pillars.length) return;
+  const pal = MAP_KEY === 'spires' ? [0xa9583a, 0xc27a4e, 0x8e4a33, 0xd09468] : [0x6f6a62, 0x857d70, 0x5d5a55, 0x9a917f];
+  const mat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
+  const c = new THREE.Color();
+  const jit = (a, y) => { const v = Math.sin(a * 12.9898 + y * 0.78233) * 43758.5453; return v - Math.floor(v); };
+  for (const pl of pillars) {
+    const g = new THREE.CylinderGeometry(pl.rt, pl.rb, pl.h, 7, Math.max(3, Math.round(pl.h / 70)));
+    const pa = g.attributes.position;
+    for (let i = 0; i < pa.count; i++) {
+      const x = pa.getX(i), y = pa.getY(i), z = pa.getZ(i), ang = Math.round(Math.atan2(z, x) * 100);
+      const k = 0.86 + 0.3 * jit(ang, Math.round(y));
+      pa.setX(i, x * k); pa.setZ(i, z * k);
+    }
+    const ng = g.toNonIndexed();
+    const p2 = ng.attributes.position, cols = new Float32Array(p2.count * 3);
+    for (let i = 0; i < p2.count; i += 3) {
+      const y = (p2.getY(i) + p2.getY(i + 1) + p2.getY(i + 2)) / 3 + pl.h / 2 + pl.y0;
+      c.setHex(pal[((Math.floor((y + 1000) / 45) % pal.length) + pal.length) % pal.length]).offsetHSL(0, 0, rand(-0.03, 0.03));
+      for (let k = 0; k < 3; k++) { cols[(i + k) * 3] = c.r; cols[(i + k) * 3 + 1] = c.g; cols[(i + k) * 3 + 2] = c.b; }
+    }
+    ng.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+    const m = new THREE.Mesh(ng, mat);
+    m.position.set(pl.x, pl.y0 + pl.h / 2, pl.z);
+    m.rotation.y = rand(0, 6.28);
+    scene.add(m);
+  }
+})();
+
 /* ---------- trees ---------- */
 let treeMesh = null, treeOrig = null, treeXZ = [];
 (function buildTrees() {
   const geo = new THREE.ConeGeometry(14, 46, 5); geo.translate(0, 23, 0);
-  const count = 650;
-  const trees = new THREE.InstancedMesh(geo, lambert(0x2f6b2a), count);
+  const count = Math.max(1, MAP.trees);
+  const trees = new THREE.InstancedMesh(geo, lambert(MAP_KEY === 'ocean' ? 0x3f8a3a : 0x2f6b2a), count);
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), s = V(), p = V();
   let n = 0, guard = 0;
-  while (n < count && guard++ < 10000) {
-    const a = rand(0, Math.PI * 2), d = rand(820, R * 0.97);
-    const x = Math.cos(a) * d, z = Math.sin(a) * d, h = groundH(x, z);
-    if (h > 220) continue;
+  while (n < MAP.trees && guard++ < 30000) {
+    const a = rand(0, Math.PI * 2), d = rand(MAP_KEY === 'ocean' ? 600 : 820, R * 0.97);
+    const x = Math.cos(a) * d, z = Math.sin(a) * d, h = groundBase(x, z);
+    if (h > (MAP_KEY === 'ocean' ? 80 : 220)) continue;
+    if (WATER_Y !== null && h < WATER_Y + 14) continue; // no trees in the sea or on the beach
     s.set(1, rand(0.7, 1.5), 1).multiplyScalar(rand(0.8, 1.4));
     m4.compose(p.set(x, h - 2, z), q.setFromAxisAngle(AY, rand(0, 6.28)), s);
     treeXZ.push(x, z);
@@ -346,8 +537,8 @@ function addBuilding(x, z, w, h, d, col, roof) {
 
 /* ---------- clouds ---------- */
 (function buildClouds() {
-  const mat = new THREE.MeshLambertMaterial({ color: 0xffffff, flatShading: true, transparent: true, opacity: 0.9 });
-  for (let i = 0; i < 34; i++) {
+  const mat = new THREE.MeshLambertMaterial({ color: MAP.cloud, flatShading: true, transparent: true, opacity: 0.9 });
+  for (let i = 0; i < MAP.clouds; i++) {
     const g = new THREE.Group();
     const parts = 3 + (Math.random() * 3 | 0);
     for (let k = 0; k < parts; k++) {
@@ -726,6 +917,10 @@ function bombDamageWorld(p, radius) {
 }
 
 function digCrater(p) {
+  if (WATER_Y !== null && groundBase(p.x, p.z) - craterDepthAt(p.x, p.z) < WATER_Y + 1) {
+    if (p.y - WATER_Y < 170) { explode(V(p.x, WATER_Y, p.z), 70, 0xe8f6ff, 0); explode(V(p.x, WATER_Y + 30, p.z), 40, 0xbfe6ff, 0); }
+    return;
+  }
   const gy = groundH(p.x, p.z), above = p.y - gy;
   if (above > 170 || craters.length >= MAX_CRATERS || !terrainMesh) return;
   const k = 1 - Math.max(0, above) / 170;            // closer to the ground = bigger hole
@@ -930,8 +1125,15 @@ function killPlayer() {
   boom(2, 0.9, 1600); shake = 1;
 }
 function respawn() {
-  const a = rand(0, Math.PI * 2);
-  P.pos.set(Math.cos(a) * R * 0.8, 450, Math.sin(a) * R * 0.8);
+  // start on the edge of the zone, facing the base, with a clear lane ahead
+  const lane = V();
+  for (let tries = 0; tries < 60; tries++) {
+    const a = rand(0, Math.PI * 2);
+    P.pos.set(Math.cos(a) * R * 0.8, 450, Math.sin(a) * R * 0.8);
+    let clear = true;
+    for (let k = 0; k <= 8 && clear; k++) { lane.copy(P.pos).multiplyScalar(1 - k * 0.08); if (pillarAt(lane, 90)) clear = false; }
+    if (clear) break;
+  }
   P.yaw = Math.atan2(P.pos.x, P.pos.z); P.pitch = 0; P.roll = 0; P.bank = 0;
   P.speed = BASE_SPEED; P.shield = 100; P.maxShield = 100; P.gold = 0; P.bombs = Math.max(P.bombs, 3);
   P.g = 0; P.locked = false; P.dead = false; P.invuln = 3; P.activeBomb = null; lowWarned = false;
@@ -1058,6 +1260,17 @@ function updatePlayer(dt, inp) {
     else if (top < bot) P.pos.y = MS_Y + 64; else P.pos.y = MS_Y - 106;
     if (P.hurtCd <= 0) { hurt(P.maxShield * 0.7, true); P.hurtCd = 0.6; explode(P.pos, 12, 0xffe080, 3); }
   }
+  // --- rock pillars (sea stacks / spires)
+  const pl = pillars.length ? pillarAt(P.pos, 6) : null;
+  if (pl) {
+    let nx = P.pos.x - pl.x, nz = P.pos.z - pl.z; const nd = Math.hypot(nx, nz) || 1; nx /= nd; nz /= nd;
+    const t = clamp((P.pos.y - pl.y0) / pl.h, 0, 1), rr = (pl.rb + (pl.rt - pl.rb) * t) * 0.92 + 10;
+    P.pos.x = pl.x + nx * rr; P.pos.z = pl.z + nz * rr;
+    // glance off: reflect the heading about the rock face
+    const fx = P.fwd.x, fz = P.fwd.z, dot = fx * nx + fz * nz;
+    if (dot < 0 && !P.man) { const rx = fx - 2 * dot * nx, rz = fz - 2 * dot * nz; P.yaw = Math.atan2(-rx, -rz); resetAim(); }
+    if (P.hurtCd <= 0) { hurt(P.maxShield * 0.7, true); P.hurtCd = 0.6; explode(P.pos, 12, 0xffe080, 4); }
+  }
 
   // --- visuals
   let bt = inp.turn * 0.55;
@@ -1139,6 +1352,12 @@ function updateEnemies(dt) {
     const hd = Math.hypot(e.pos.x, e.pos.z);
     if (hd > R * 0.9) { desired.x -= e.pos.x / hd * 1.5; desired.z -= e.pos.z / hd * 1.5; }
     if (hd < MS_R + 80 && Math.abs(e.pos.y - MS_Y) < 170 && e.dir.y > -0.3) desired.y += (e.pos.y > MS_Y ? 1 : -1);
+    for (let pi = 0; pi < pillars.length; pi++) {
+      const c = pillars[pi], dx = e.pos.x - c.x, dz = e.pos.z - c.z;
+      if (dx > c.rb + 170 || dx < -c.rb - 170 || dz > c.rb + 170 || dz < -c.rb - 170 || e.pos.y > c.y0 + c.h + 60) continue;
+      const dd = Math.hypot(dx, dz) || 1, w = 1 - (dd - c.rb) / 170;
+      if (w > 0) { desired.x += dx / dd * 2.4 * w; desired.z += dz / dd * 2.4 * w; }
+    }
     desired.normalize();
 
     prevDir.copy(e.dir);
@@ -1149,6 +1368,11 @@ function updateEnemies(dt) {
 
     e.pos.addScaledVector(e.dir, e.speed * dt);
     if (e.pos.y < gh + 8) e.pos.y = gh + 8;
+    if (pillars.length && pillarAt(e.pos, 2)) { // flew into the rock: wrecked, no points
+      e.alive = false; scene.remove(e.mesh); if (P.lock === e) P.lock = null;
+      explode(e.pos, 26, 0xffa040, 6); boom(0.7, distVol(e.pos, 0.4), 1100);
+      continue;
+    }
 
     e.mesh.position.copy(e.pos);
     T2.copy(e.pos).add(e.dir);
@@ -1253,7 +1477,7 @@ function updateShots(dt) {
         hurt(s.dmg); s.life = 0; explode(s.pos, 8, 0xff8040, 0);
       }
     }
-    if (s.life > 0 && s.pos.y < groundH(s.pos.x, s.pos.z)) {
+    if (s.life > 0 && (s.pos.y < groundH(s.pos.x, s.pos.z) || (pillars.length && pillarAt(s.pos, 0)))) {
       if (s.splash) detonate(s); else { s.life = 0; if (s.kind === 'laser') explode(s.pos, 4, 0xffe080, 0); }
     }
     if (s.life <= 0) {
@@ -1480,6 +1704,9 @@ function drawHUD() {
   hx.strokeStyle = 'rgba(63,208,106,.35)'; hx.lineWidth = 1;
   hx.beginPath(); hx.arc(cx, cy, R * s, 0, Math.PI * 2); hx.stroke();
   hx.beginPath(); hx.moveTo(cx - rr, cy); hx.lineTo(cx + rr, cy); hx.moveTo(cx, cy - rr); hx.lineTo(cx, cy + rr); hx.stroke();
+  for (const i of islands) { hx.fillStyle = 'rgba(120,190,90,.35)'; hx.beginPath(); hx.arc(cx + i.x * s, cy + i.z * s, i.r * s, 0, Math.PI * 2); hx.fill(); }
+  hx.fillStyle = 'rgba(225,205,175,.7)';
+  for (const c of pillars) { hx.beginPath(); hx.arc(cx + c.x * s, cy + c.z * s, Math.max(1.4, c.rb * s), 0, Math.PI * 2); hx.fill(); }
   hx.fillStyle = 'rgba(180,180,200,.6)'; hx.beginPath(); hx.arc(cx, cy, MS_R * s, 0, Math.PI * 2); hx.fill();
   for (const p of pickups) { hx.fillStyle = p.type === 'gold' ? '#ffc93a' : p.type === 'laser' ? '#6cff6c' : p.type === 'bomb' ? '#ff6060' : '#e0e8f0'; hx.fillRect(cx + p.pos.x * s - 2, cy + p.pos.z * s - 2, 4, 4); }
   for (const e of enemies) {
@@ -1538,12 +1765,16 @@ function startGame() {
   hits = 0; rivalNext = 60; spawnT = 0; runT = 0; threat = 1; D = 0; tailWarnCd = 6; lowWarned = false; edgeHinted = false;
   Object.assign(P, { lives: 1, bombs: 3, laser: 0, charge: 0, fireHeld: 0, lock: null, man: null, shieldT: 0, tailT: 0 });
   respawn(); P.invuln = 1.5;
-  for (let i = 0; i < 6; i++) { const e = spawnEnemy(false); e.pos.set(rand(-R, R) * 0.6, rand(300, 800), rand(-R, R) * 0.6); }
+  for (let i = 0; i < 6; i++) { const e = spawnEnemy(false); do { e.pos.set(rand(-R, R) * 0.6, rand(300, 800), rand(-R, R) * 0.6); } while (pillarAt(e.pos, 120)); }
   // three gold rings placed around the arena
   for (let i = 0; i < 3; i++) {
     const a = i / 3 * Math.PI * 2 + 0.5, d = R * rand(0.45, 0.7);
-    const pos = V(Math.cos(a) * d, 0, Math.sin(a) * d);
+    let pos = V(Math.cos(a) * d, 0, Math.sin(a) * d);
     pos.y = Math.max(groundH(pos.x, pos.z) + 90, 260);
+    for (let tries = 0; tries < 30 && pillarAt(pos, 60); tries++) {
+      const d2 = R * rand(0.4, 0.75), a2 = a + rand(-0.5, 0.5);
+      pos = V(Math.cos(a2) * d2, 0, Math.sin(a2) * d2); pos.y = Math.max(groundH(pos.x, pos.z) + 90, 260);
+    }
     pos.fixed = true;
     makePickup('gold', pos);
   }
@@ -1568,7 +1799,7 @@ function gameOver() {
   if (nb) { best = hits; try { localStorage.setItem('allrange_best', best); } catch (e) {} }
   document.getElementById('overHits').textContent = hits + (hits === 1 ? ' HIT' : ' HITS');
   const m = Math.floor(runT / 60), sec = Math.floor(runT % 60);
-  document.getElementById('overStats').textContent = 'Survived ' + m + ':' + String(sec).padStart(2, '0') + ' · Threat level ' + threat;
+  document.getElementById('overStats').textContent = 'Survived ' + m + ':' + String(sec).padStart(2, '0') + ' · Threat level ' + threat + ' · ' + MAP.name;
   document.getElementById('overBest').textContent = nb ? 'NEW PERSONAL BEST!' : 'Your best: ' + best;
   document.getElementById('best').textContent = best;
   document.getElementById('over').classList.remove('hidden');
@@ -1587,7 +1818,7 @@ const lbName = n => String(n || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slic
 function lbClean(list) {
   return (Array.isArray(list) ? list : [])
     .filter(e => e && Number.isFinite(e.s) && e.s > 0)
-    .map(e => ({ n: lbName(e.n) || '???', s: Math.floor(e.s), t: Math.floor(e.t || 0), d: e.d || 0 }))
+    .map(e => ({ n: lbName(e.n) || '???', s: Math.floor(e.s), t: Math.floor(e.t || 0), d: e.d || 0, m: MAP_KEYS.includes(e.m) ? e.m : undefined }))
     .sort((a, b) => b.s - a.s || b.t - a.t)
     .slice(0, LB_SIZE);
 }
@@ -1643,7 +1874,7 @@ async function lbSubmit() {
   $('lbStatus').textContent = 'Saving…';
   try {
     const fresh = await lbFetch(); // merge with the latest board in case someone else just saved
-    const mine = { n, s: lb.score, t: lb.secs, d: Date.now() };
+    const mine = { n, s: lb.score, t: lb.secs, d: Date.now(), m: MAP_KEY };
     const merged = lbClean([...fresh, mine]);
     const r = await fetch(LB_URL, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(merged) });
     if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -1852,6 +2083,7 @@ function frame(now) {
   syncTouchUI();
 
   carrier.rotation.y += dt * 0.05;
+  updateWater(now / 1000);
   if (state === 'play') {
     time += dt;
     if (!P.dead) runT += dt;
@@ -1878,6 +2110,8 @@ function frame(now) {
 }
 resize();
 ship.visible = false;
+document.getElementById('mapName').textContent = MAP.name;
+document.getElementById('mapBlurb').textContent = MAP.blurb;
 requestAnimationFrame(frame);
 
 // small debug hook for testing

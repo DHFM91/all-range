@@ -4,6 +4,16 @@ A free-flight 3D arcade dogfighter that runs in your browser. Fly anywhere insid
 
 **Play:** https://dhfm91.github.io/all-range/
 
+## Maps
+
+A different map is picked every day at midnight (Eastern), never the same one two days in a row:
+
+- **Green Valley**: rolling hills and forest around the base.
+- **Broken Sea**: an island base in open water, ringed by sea stacks. The sea surface is as hard as the ground.
+- **Spire Canyon**: red rock canyons and dozens of tall stone spires to thread between.
+
+To try a specific map, add `?map=valley`, `?map=ocean` or `?map=spires` to the address.
+
 ## Controls
 
 ### Mouse + keyboard (recommended)
