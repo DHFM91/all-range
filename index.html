@@ -1864,6 +1864,7 @@ function gameOver() {
    GLOBAL SCOREBOARD (shared JSON bin, top 10 by hits, time survived breaks ties)
    ===================================================================== */
 const LB_URL = 'https://json.extendsclass.com/bin/4e36ecfecd7a';
+const lbReadJson = async r => { const t = await r.text(), i = t.search(/<!doctype|<html/i); return JSON.parse(i < 0 ? t : t.slice(0, i)); }; // the score host sometimes tacks a web page onto its reply; read only the JSON part
 const LB_SIZE = 10;
 const lb = { board: [], score: 0, secs: 0, mine: null, entering: false };
 const $ = id => document.getElementById(id);
@@ -1881,7 +1882,7 @@ async function lbFetch() {
   try {
     const r = await fetch(LB_URL, { signal: ctl.signal, cache: 'no-store' });
     if (!r.ok) throw new Error('HTTP ' + r.status);
-    return lbClean(await r.json());
+    return lbClean(await lbReadJson(r));
   } finally { clearTimeout(timer); }
 }
 function lbRender() {
